@@ -20,12 +20,16 @@ from .database import Base, engine, get_db
 
 app = FastAPI(title="Shakarim Sport API", version="1.0.0")
 
+_default_origins = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
+_env_origins = os.environ.get("ALLOWED_ORIGINS", "")
+_origins = _default_origins + [o.strip() for o in _env_origins.split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-    ],
+    allow_origins=_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -458,23 +462,16 @@ def admin_delete_booking(booking_id: int, db: Session = Depends(get_db), _: None
 
 app.include_router(router)
 
-# Раздача собранного фронтенда (после npm run build)
-import os
+# ---------- DB init (lazy, для совместимости с serverless) ----------
 
-_dist_dir = os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "dist")
-if os.path.isdir(_dist_dir):
-
-    @app.get("/{full_path:path}", include_in_schema=False)
-    async def spa_fallback(full_path: str):
-        """Отдаёт index.html для маршрутов Vue (SPA-fallback), файлы — напрямую."""
-        file_path = os.path.normpath(os.path.join(_dist_dir, full_path))
-        if full_path and file_path.startswith(os.path.abspath(_dist_dir)) and os.path.isfile(file_path):
-            return FileResponse(file_path)
-        return FileResponse(os.path.join(_dist_dir, "index.html"))
+_db_initialized = False
 
 
-@app.on_event("startup")
-def seed():
+def _ensure_db():
+    """Создаёт таблицы и seed-данные при первом запросе (serverless-safe)."""
+    global _db_initialized
+    if _db_initialized:
+        return
     Base.metadata.create_all(engine)
     import json
 
@@ -483,6 +480,7 @@ def seed():
     db = SessionLocal()
     try:
         if db.scalar(select(func.count(models.Venue.id))):
+            _db_initialized = True
             return
         venues = [
             models.Venue(
@@ -542,5 +540,14 @@ def seed():
         ]
         db.add_all(venues)
         db.commit()
+        _db_initialized = True
     finally:
         db.close()
+
+
+@app.middleware("http")
+async def ensure_db_middleware(request, call_next):
+    """Гарантирует инициализацию БД перед обработкой запроса."""
+    _ensure_db()
+    return await call_next(request)
+

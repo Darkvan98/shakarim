@@ -6,6 +6,7 @@ from .config import DB_URL
 engine = create_engine(
     DB_URL,
     connect_args={"check_same_thread": False} if DB_URL.startswith("sqlite") else {},
+    pool_pre_ping=True,  # автопроверка соединения (важно для serverless)
 )
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
