@@ -1,0 +1,8 @@
+node_modules/
+dist/
+*.log
+*.db
+.env
+.freebuff/
+__pycache__/
+.venv/
