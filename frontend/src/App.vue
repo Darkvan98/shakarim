@@ -42,19 +42,6 @@ const links = [
     <footer class="footer">
       <div class="container footer-grid">
         <div>
-          <h3>Shakarim Sport</h3>
-          <p class="muted">
-            Спортивный комплекс Shakarim University.<br />
-            Спорт — денсаулық кепілі!
-          </p>
-        </div>
-        <div>
-          <h4>Разделы</h4>
-          <p v-for="l in links" :key="l.to">
-            <router-link :to="l.to">{{ l.label }}</router-link>
-          </p>
-        </div>
-        <div>
           <h4>Контакты</h4>
           <p class="muted">
             г. Семей, ул. Глинки 1А<br />
