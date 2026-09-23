@@ -17,7 +17,7 @@ import { getVenues, formatPrice } from '../api'
           </div>
         </div>
         <div class="hero-photo card">
-          <img src="/images/hero-hall-universal.png" alt="Спорткомплекс Shakarim University — универсальный игровой зал" />
+          <img src="/images/hero-gym-wide.jpg" alt="Спорткомплекс Shakarim University — светлый спортивный зал с деревянным полом" />
         </div>
       </div>
     </section>
