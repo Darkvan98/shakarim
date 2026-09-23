@@ -84,15 +84,22 @@ import { getVenues, formatPrice } from '../api'
       <div class="container">
         <span class="eyebrow">Галерея</span>
         <h2>Наш комплекс изнутри</h2>
-        <div class="gallery">
-          <img
-            v-for="n in 9"
-            :key="n"
-            :src="`/images/gallery/photo-${n}.jpeg`"
-            :alt="`Фото спорткомплекса ${n}`"
-            loading="lazy"
-            @click="openLightbox(n)"
-          />
+
+        <div class="gallery-group" v-for="group in galleryGroups" :key="group.key">
+          <div class="gallery-group-head">
+            <h3>{{ group.title }}</h3>
+            <p class="muted">{{ group.subtitle }}</p>
+          </div>
+          <div class="gallery">
+            <img
+              v-for="n in group.photos"
+              :key="n"
+              :src="group.src(n)"
+              :alt="group.alt(n)"
+              loading="lazy"
+              @click="openLightbox(n)"
+            />
+          </div>
         </div>
       </div>
     </section>
@@ -101,6 +108,7 @@ import { getVenues, formatPrice } from '../api'
     <div v-if="lightbox" class="lightbox" @click="lightbox = null">
       <img :src="`/images/gallery/photo-${lightbox}.jpeg`" alt="Фото зала" />
       <button class="lightbox-close" aria-label="Закрыть">×</button>
+      <div class="lightbox-caption" v-if="lightboxCaption">{{ lightboxCaption }}</div>
     </div>
   </div>
 </template>
@@ -108,7 +116,49 @@ import { getVenues, formatPrice } from '../api'
 <script>
 export default {
   data() {
-    return { venues: [], loading: true, lightbox: null }
+    return {
+      venues: [],
+      loading: true,
+      lightbox: null,
+      lightboxCaption: null,
+      // Группы фото по площадкам. Некоторые фото общие для нескольких залов.
+      // Файлы переименованы в формат: photo-<N>-sport-<ключ>.jpeg
+      // Например: photo-1-sport-1.jpeg, photo-3-sport-2-football.jpeg, photo-9-sport-2-volleyball.jpeg, photo-9-sport-2-tennis.jpeg
+      galleryGroups: [
+        {
+          key: 'sport-1',
+          title: 'Спорткомплекс 1',
+          subtitle: 'первые 2 фото',
+          photos: [1, 2],
+          src: (n) => `/images/gallery/photo-${n}-sport-1.jpeg`,
+          alt: (n) => `Фото Спорткомплекс 1, фото ${n}`,
+        },
+        {
+          key: 'sport-2-1',
+          title: 'Спорткомплекс 2, 1 этаж, футзал',
+          subtitle: 'фото с 3 по 8',
+          photos: [3, 4, 5, 6, 7, 8],
+          src: (n) => `/images/gallery/photo-${n}-sport-2-football.jpeg`,
+          alt: (n) => `Фото Спорткомплекс 2, 1 этаж, футзал, фото ${n}`,
+        },
+        {
+          key: 'sport-2-2-volleyball',
+          title: '2-й спорткомплекс, 2 этаж, зал волейбола',
+          subtitle: 'фото с 9 по 10',
+          photos: [9, 10],
+          src: (n) => `/images/gallery/photo-${n}-sport-2-volleyball.jpeg`,
+          alt: (n) => `Фото 2-й спорткомплекс, 2 этаж, зал волейбола, фото ${n}`,
+        },
+        {
+          key: 'sport-2-1-tennis',
+          title: '2-й спорткомплекс, 1 этаж, теннисный зал',
+          subtitle: 'последние 3 фото',
+          photos: [9, 10, 11],
+          src: (n) => `/images/gallery/photo-${n}-sport-2-tennis.jpeg`,
+          alt: (n) => `Фото 2-й спорткомплекс, 1 этаж, теннисный зал, фото ${n}`,
+        },
+      ],
+    }
   },
   async mounted() {
     try {
@@ -120,6 +170,15 @@ export default {
   methods: {
     openLightbox(n) {
       this.lightbox = n
+      this.lightboxCaption = this.findCaptionFor(n)
+    },
+    findCaptionFor(n) {
+      for (const g of this.galleryGroups) {
+        if (g.photos.includes(n)) {
+          return g.title
+        }
+      }
+      return null
     },
     formatPrice,
   },
@@ -200,10 +259,38 @@ export default {
   color: #fff;
   font-size: 40px;
   cursor: pointer;
-}
-
-@media (max-width: 860px) {
+}    @media (max-width: 860px) {
   .hero-inner { grid-template-columns: 1fr; padding: 44px 20px; }
   .hero-photo img { height: 240px; }
+}
+
+.gallery-group { margin-bottom: 28px; }
+.gallery-group-head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+.gallery-group-head h3 {
+  margin: 0;
+  font-size: 18px;
+  color: var(--navy);
+}
+.gallery-group-head .muted {
+  display: block;
+  margin: 0;
+  font-size: 13px;
+}
+.lightbox-caption {
+  position: absolute;
+  bottom: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(20, 26, 40, 0.85);
+  color: #fff;
+  padding: 8px 16px;
+  border-radius: 999px;
+  font-size: 14px;
+  white-space: nowrap;
 }
 </style>
