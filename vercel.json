@@ -19,7 +19,7 @@
     },
     {
       "src": "/images/(.*)",
-      "dest": "/frontend/dist/images/$1"
+      "dest": "/frontend/images/$1"
     },
     {
       "handle": "filesystem"
