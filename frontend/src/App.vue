@@ -15,7 +15,7 @@ const links = [
     <header class="header">
       <div class="container header-inner">
         <router-link to="/" class="logo">
-          <span class="logo-mark"><img class="logo-img" src="/images/logo.png" alt="Shakarim University" /></span>
+          <img class="logo-img" src="/images/logo.png" alt="Shakarim University, 1934" />
           <span class="logo-text">
             <strong>SHAKARIM SPORT</strong>
             <small>аренда спорткомплекса</small>
@@ -42,6 +42,7 @@ const links = [
     <footer class="footer">
       <div class="container footer-grid">
         <div>
+          <img class="footer-logo" src="/images/logo.png" alt="Shakarim University, 1934" />
           <h4>Контакты</h4>
           <p class="muted">
             г. Семей, ул. Глинки 1А<br />
@@ -71,20 +72,10 @@ const links = [
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  height: 66px;
+  height: 96px;
 }
-.logo { display: flex; align-items: center; gap: 10px; }
-.logo-mark {
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
-  background: var(--navy);
-  display: grid;
-  place-items: center;
-  padding: 5px;
-  flex: none;
-}
-.logo-img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.logo { display: flex; align-items: center; gap: 14px; }
+.logo-img { height: 84px; width: auto; object-fit: contain; display: block; }
 .logo-text { display: flex; flex-direction: column; line-height: 1.15; }
 .logo-text strong { color: var(--navy); font-size: 15px; letter-spacing: 0.04em; }
 .logo-text small { color: var(--muted); font-size: 11.5px; }
@@ -108,7 +99,7 @@ const links = [
   .nav {
     display: none;
     position: absolute;
-    top: 66px;
+    top: 96px;
     left: 0;
     right: 0;
     background: #fff;
@@ -121,6 +112,7 @@ const links = [
 }
 
 .footer { background: var(--navy); color: #cfd6e4; margin-top: 60px; }
+.footer-logo { height: 170px; width: auto; display: block; margin-bottom: 18px; }
 .footer h3, .footer h4 { color: #fff; }
 .footer a { color: var(--gold); }
 .footer-grid {
