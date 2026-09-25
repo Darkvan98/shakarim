@@ -42,9 +42,6 @@ getVenues()
   <div class="container section">
     <span class="eyebrow">Залы и цены</span>
     <h1>Площадки спорткомплекса</h1>
-    <p class="lead">
-      Стоимость указана за час аренды: в будни и в выходные. В цену входит уборка после занятия.
-    </p>
 
     <div v-if="loading" class="muted">Загрузка…</div>
 
