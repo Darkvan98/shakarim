@@ -15,7 +15,7 @@ const links = [
     <header class="header">
       <div class="container header-inner">
         <router-link to="/" class="logo">
-          <img class="logo-img" src="/images/logo.png" alt="Shakarim University, 1934" />
+          <img class="logo-img" src="/images/logo-dark.png" alt="Shakarim University, 1934" />
           <span class="logo-text">
             <strong>SHAKARIM SPORT</strong>
             <small>аренда спорткомплекса</small>
@@ -76,6 +76,12 @@ const links = [
 }
 .logo { display: flex; align-items: center; gap: 14px; }
 .logo-img { height: 84px; width: auto; object-fit: contain; display: block; }
+@media (max-width: 760px) {
+  .logo { gap: 8px; }
+  .logo-img { height: 56px; }
+  .logo-text strong { font-size: 13px; }
+  .logo-text small { font-size: 10px; }
+}
 .logo-text { display: flex; flex-direction: column; line-height: 1.15; }
 .logo-text strong { color: var(--navy); font-size: 15px; letter-spacing: 0.04em; }
 .logo-text small { color: var(--muted); font-size: 11.5px; }
