@@ -134,13 +134,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="container section">
-    <span class="eyebrow">Онлайн-бронирование</span>
-    <h1>Забронировать зал</h1>
-    <p class="lead">
-      Выберите зал, дату и свободное время. Бронь подтверждается администратором по телефону.
-    </p>
-
+  <div class="container section booking-page">
     <div v-if="booking" class="card success-card">
       <h2>Бронь создана! 🎉</h2>
       <p>Код вашей брони: <strong class="code">{{ booking.code }}</strong></p>
@@ -225,6 +219,7 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+.booking-page { max-width: 1100px; margin-left: auto; margin-right: auto; }
 .booking-layout { display: grid; grid-template-columns: 1.6fr 1fr; gap: 24px; margin-top: 22px; align-items: start; }
 .form-card { padding: 24px 26px; }
 .summary { padding: 22px 24px; position: sticky; top: 84px; }
