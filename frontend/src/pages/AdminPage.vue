@@ -144,6 +144,7 @@ function triggerGalleryFile(idx) {
 
 const token = ref(localStorage.getItem('adminToken') || '')
 const logged = ref(false)
+const username = ref('')
 const password = ref('')
 const error = ref('')
 
@@ -194,14 +195,31 @@ const venueTitle = computed(() =>
 )
 
 function authHeaders() {
-  return { 'X-Admin-Token': token.value }
+  return { Authorization: `Bearer ${token.value}` }
 }
 
 async function login() {
   error.value = ''
-  localStorage.setItem('adminToken', password.value)
-  token.value = password.value
-  await load()
+  loading.value = true
+  try {
+    const { token: sessionToken } = await api('/api/admin/login', {
+      method: 'POST',
+      body: JSON.stringify({ username: username.value, password: password.value }),
+    })
+    token.value = sessionToken
+    localStorage.setItem('adminToken', sessionToken)
+    await load()
+  } catch (e) {
+    error.value = e.message
+  } finally {
+    loading.value = false
+  }
+}
+
+function logout() {
+  token.value = ''
+  logged.value = false
+  localStorage.removeItem('adminToken')
 }
 
 async function load() {
@@ -216,7 +234,11 @@ async function load() {
   } catch (e) {
     error.value = e.message
     logged.value = false
-    localStorage.removeItem('adminToken')
+    if (!username.value) {
+      // протухшая сессия — покажем форму входа
+      localStorage.removeItem('adminToken')
+      token.value = ''
+    }
   } finally {
     loading.value = false
   }
@@ -356,18 +378,26 @@ onMounted(() => {
     <!-- LOGIN -->
     <div v-if="!logged" class="card login-card">
       <h3>Вход</h3>
-      <p class="muted">Введите админ-токен (по умолчанию: shakarim-admin)</p>
+      <p class="muted">Введите логин и пароль администратора</p>
       <div class="field">
-        <input v-model="password" type="password" placeholder="Токен" @keyup.enter="login" />
+        <label>Логин</label>
+        <input v-model="username" autocomplete="username" placeholder="admin" @keyup.enter="login" />
+      </div>
+      <div class="field">
+        <label>Пароль</label>
+        <input v-model="password" type="password" autocomplete="current-password" placeholder="••••••••" @keyup.enter="login" />
       </div>
       <div v-if="error" class="alert alert-error">{{ error }}</div>
-      <button class="btn btn-primary" :disabled="!password || loading" @click="login">
+      <button class="btn btn-primary" :disabled="!username || !password || loading" @click="login">
         {{ loading ? 'Проверяем…' : 'Войти' }}
       </button>
     </div>
 
     <!-- DASHBOARD -->
     <template v-else>
+      <div class="toolbar admin-logout-row">
+        <button class="btn btn-outline btn-sm" @click="logout">Выйти</button>
+      </div>
       <div v-if="error" class="alert alert-error">{{ error }}</div>
 
       <div class="tabs">
@@ -716,6 +746,8 @@ th { color: var(--muted); font-size: 12.5px; text-transform: uppercase; letter-s
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 .form-actions { display: flex; gap: 12px; margin-top: 18px; }
 textarea { width: 100%; font: inherit; padding: 10px 12px; border: 1.5px solid var(--gray); border-radius: 10px; resize: vertical; }
+
+.admin-logout-row { display: flex; justify-content: flex-end; }
 
 /* gallery admin */
 .gallery-admin-list { display: flex; flex-direction: column; gap: 16px; margin-top: 6px; }

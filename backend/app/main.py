@@ -1,6 +1,7 @@
 import json
 import os
 import re
+import secrets
 import shutil
 import unicodedata
 import uuid
@@ -15,7 +16,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from . import models
-from .config import ADMIN_TOKEN, CLOSE_HOUR, MAX_DAYS_AHEAD, OPEN_HOUR, WEEKEND_MULTIPLIER
+from .config import ADMIN_PASSWORD, ADMIN_TOKEN, ADMIN_USERNAME, CLOSE_HOUR, MAX_DAYS_AHEAD, OPEN_HOUR, WEEKEND_MULTIPLIER
 from .database import Base, engine, get_db
 
 app = FastAPI(title="Shakarim Sport API", version="1.0.0")
@@ -127,6 +128,15 @@ class GalleryGroupPayload(BaseModel):
 
 class GalleryGroupOut(GalleryGroupPayload):
     id: int
+
+
+class AdminLoginRequest(BaseModel):
+    username: str = Field(min_length=1, max_length=100)
+    password: str = Field(min_length=1, max_length=200)
+
+
+class AdminLoginOut(BaseModel):
+    token: str
 
 
 # ---------- Helpers ----------
@@ -302,12 +312,51 @@ def get_booking(code: str, db: Session = Depends(get_db)):
 
 # ---------- Admin auth ----------
 
-def require_admin(x_admin_token: str = Header(default="")):
-    if x_admin_token != ADMIN_TOKEN:
-        raise HTTPException(401, "Неверный админ-токен")
+# Сессии админа: токен -> время создания. В памяти процесса (для serverless — достаточно).
+_admin_sessions: dict[str, float] = {}
+_SESSION_TTL = 12 * 60 * 60  # 12 часов
+
+
+def _create_session() -> str:
+    """Создаёт сессионный токен и сохраняет его в памяти."""
+    token = secrets.token_hex(32)
+    _admin_sessions[token] = datetime.utcnow().timestamp()
+    return token
+
+
+def _session_valid(token: str) -> bool:
+    ts = _admin_sessions.get(token)
+    if not ts:
+        return False
+    if datetime.utcnow().timestamp() - ts > _SESSION_TTL:
+        _admin_sessions.pop(token, None)
+        return False
+    return True
+
+
+def require_admin(
+    x_admin_token: str = Header(default=""),
+    authorization: str = Header(default=""),
+):
+    """Принимает либо сессионный Bearer-токен (новый вход по логину/паролю),
+    либо статичный X-Admin-Token (для совместимости)."""
+    if authorization.startswith("Bearer "):
+        if _session_valid(authorization.removeprefix("Bearer ").strip()):
+            return
+    if x_admin_token and x_admin_token == ADMIN_TOKEN:
+        return
+    raise HTTPException(401, "Требуется авторизация администратора")
 
 
 # ---------- Gallery ----------
+
+@router.post("/admin/login", response_model=AdminLoginOut)
+def admin_login(payload: AdminLoginRequest):
+    """Вход по логину и паролю → сессионный токен."""
+    if payload.username != ADMIN_USERNAME or payload.password != ADMIN_PASSWORD:
+        raise HTTPException(401, "Неверный логин или пароль")
+    return AdminLoginOut(token=_create_session())
+
 
 @router.get("/gallery", response_model=list[GalleryGroupOut])
 def list_gallery(db: Session = Depends(get_db)):

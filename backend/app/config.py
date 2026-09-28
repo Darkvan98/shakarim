@@ -24,8 +24,12 @@ elif _raw_db_url.startswith("postgresql://"):
 else:
     DB_URL = _raw_db_url
 
-# Токен для доступа к админ-панели (смените в продакшене через переменную окружения)
+# Токен для доступа к админ-панели (совместимость; новые входы — через логин/пароль)
 ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "shakarim-admin")
+
+# Логин и пароль администратора (смените в продакшене через переменные окружения)
+ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "shakarim2026")
 
 OPEN_HOUR = 8    # 08:00
 CLOSE_HOUR = 22  # 22:00
