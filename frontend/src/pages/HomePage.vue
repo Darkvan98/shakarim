@@ -27,7 +27,6 @@ import { getGallery, getVenues, formatPrice } from '../api'
       <div class="container">
         <span class="eyebrow">Наши залы</span>
         <h2>Выберите площадку</h2>
-        <p class="lead">Три зала под разные задачи — от турниров до персональных тренировок.</p>
 
         <div v-if="loading" class="muted">Загрузка…</div>
         <div v-else class="grid-3">
