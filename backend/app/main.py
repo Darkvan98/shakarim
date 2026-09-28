@@ -1,3 +1,5 @@
+import hashlib
+import hmac
 import json
 import os
 import re
@@ -16,7 +18,16 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from . import models
-from .config import ADMIN_PASSWORD, ADMIN_TOKEN, ADMIN_USERNAME, CLOSE_HOUR, MAX_DAYS_AHEAD, OPEN_HOUR, WEEKEND_MULTIPLIER
+from .config import (
+    ADMIN_DAILY_SECRET,
+    ADMIN_PASSWORD,
+    ADMIN_TOKEN,
+    ADMIN_USERNAME,
+    CLOSE_HOUR,
+    MAX_DAYS_AHEAD,
+    OPEN_HOUR,
+    WEEKEND_MULTIPLIER,
+)
 from .database import Base, engine, get_db
 
 app = FastAPI(title="Shakarim Sport API", version="1.0.0")
@@ -133,10 +144,12 @@ class GalleryGroupOut(GalleryGroupPayload):
 class AdminLoginRequest(BaseModel):
     username: str = Field(min_length=1, max_length=100)
     password: str = Field(min_length=1, max_length=200)
+    daily_code: str = Field(min_length=1, max_length=10)
 
 
 class AdminLoginOut(BaseModel):
     token: str
+    daily_code: str
 
 
 # ---------- Helpers ----------
@@ -324,6 +337,17 @@ def _create_session() -> str:
     return token
 
 
+def daily_code_for(d: date) -> str:
+    """Ежедневный код доступа: первые 6 цифр HMAC(секрет, дата). Меняется в полночь."""
+    digest = hmac.new(
+        ADMIN_DAILY_SECRET.encode(),
+        d.isoformat().encode(),
+        hashlib.sha256,
+    ).hexdigest()
+    digits = "".join(ch for ch in digest if ch.isdigit())
+    return (digits + "000000")[:6]
+
+
 def _session_valid(token: str) -> bool:
     ts = _admin_sessions.get(token)
     if not ts:
@@ -352,10 +376,27 @@ def require_admin(
 
 @router.post("/admin/login", response_model=AdminLoginOut)
 def admin_login(payload: AdminLoginRequest):
-    """Вход по логину и паролю → сессионный токен."""
+    """Вход по логину, паролю и ежедневному коду → сессионный токен."""
     if payload.username != ADMIN_USERNAME or payload.password != ADMIN_PASSWORD:
         raise HTTPException(401, "Неверный логин или пароль")
-    return AdminLoginOut(token=_create_session())
+    if not hmac.compare_digest(payload.daily_code.strip(), daily_code_for(date.today())):
+        raise HTTPException(401, "Неверный код дня")
+    code = daily_code_for(date.today())
+    return AdminLoginOut(token=_create_session(), daily_code=code)
+
+
+@router.get("/admin/daily-code")
+def admin_today_code(
+    x_admin_token: str = Header(default=""),
+    authorization: str = Header(default=""),
+):
+    """Сегодняшний код дня — только для уже авторизованного админа."""
+    if authorization.startswith("Bearer "):
+        if _session_valid(authorization.removeprefix("Bearer ").strip()):
+            return {"daily_code": daily_code_for(date.today())}
+    if x_admin_token and x_admin_token == ADMIN_TOKEN:
+        return {"daily_code": daily_code_for(date.today())}
+    raise HTTPException(401, "Требуется авторизация администратора")
 
 
 @router.get("/gallery", response_model=list[GalleryGroupOut])

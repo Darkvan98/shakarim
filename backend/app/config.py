@@ -31,6 +31,10 @@ ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "shakarim-admin")
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "shakarim2026")
 
+# Секрет для ежедневного кода доступа (код дня). Смените в продакшене.
+# Код дня = первые 6 цифр HMAC-SHA256(секрет, дата YYYY-MM-DD) — меняется сам каждую полночь.
+ADMIN_DAILY_SECRET = os.getenv("ADMIN_DAILY_SECRET", "shakarim-daily-secret")
+
 OPEN_HOUR = 8    # 08:00
 CLOSE_HOUR = 22  # 22:00
 MAX_DAYS_AHEAD = 30
