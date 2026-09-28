@@ -32,6 +32,10 @@ export function getVenue(slug) {
   return api(`/api/venues/${slug}`)
 }
 
+export function getGallery() {
+  return api('/api/gallery')
+}
+
 export function getOccupied(venueId, date) {
   return api(`/api/bookings/occupied?venue_id=${venueId}&date=${date}`)
 }

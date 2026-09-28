@@ -1,6 +1,6 @@
 <script setup>
 import { ref } from 'vue'
-import { getVenues, formatPrice } from '../api'
+import { getGallery, getVenues, formatPrice } from '../api'
 </script>
 
 <template>
@@ -85,28 +85,31 @@ import { getVenues, formatPrice } from '../api'
         <span class="eyebrow">Галерея</span>
         <h2>Наш комплекс изнутри</h2>
 
-        <div class="gallery-group" v-for="group in galleryGroups" :key="group.key">
+        <div class="gallery-group" v-for="group in galleryGroups" :key="group.id">
           <div class="gallery-group-head">
             <h3>{{ group.title }}</h3>
             <p class="muted">{{ group.subtitle }}</p>
           </div>
           <div class="gallery">
             <img
-              v-for="n in group.photos"
-              :key="n"
-              :src="group.src(n)"
-              :alt="group.alt(n)"
+              v-for="src in group.photos"
+              :key="src"
+              :src="src"
+              :alt="`${group.title} — фото`"
               loading="lazy"
-              @click="openLightbox(n)"
+              @click="openLightbox(src, group.title)"
             />
           </div>
+        </div>
+        <div v-if="!loading && galleryGroups.length === 0" class="muted">
+          Фотографии скоро появятся
         </div>
       </div>
     </section>
 
     <!-- LIGHTBOX -->
     <div v-if="lightbox" class="lightbox" @click="lightbox = null">
-      <img :src="`/images/gallery/photo-${lightbox}.jpeg`" alt="Фото зала" />
+      <img :src="lightbox" alt="Фото зала" />
       <button class="lightbox-close" aria-label="Закрыть">×</button>
       <div class="lightbox-caption" v-if="lightboxCaption">{{ lightboxCaption }}</div>
     </div>
@@ -118,67 +121,24 @@ export default {
   data() {
     return {
       venues: [],
+      galleryGroups: [],
       loading: true,
       lightbox: null,
       lightboxCaption: null,
-      // Группы фото по площадкам. Некоторые фото общие для нескольких залов.
-      // Файлы переименованы в формат: photo-<N>-sport-<ключ>.jpeg
-      // Например: photo-1-sport-1.jpeg, photo-3-sport-2-football.jpeg, photo-9-sport-2-volleyball.jpeg, photo-9-sport-2-tennis.jpeg
-      galleryGroups: [
-        {
-          key: 'sport-1',
-          title: 'Спорткомплекс 1',
-          subtitle: 'первые 2 фото',
-          photos: [1, 2],
-          src: (n) => `/images/gallery/photo-${n}-sport-1.jpeg`,
-          alt: (n) => `Фото Спорткомплекс 1, фото ${n}`,
-        },
-        {
-          key: 'sport-2-1',
-          title: 'Спорткомплекс 2, 1 этаж, футзал',
-          subtitle: 'фото с 3 по 8',
-          photos: [3, 4, 5, 6, 7, 8],
-          src: (n) => `/images/gallery/photo-${n}-sport-2-football.jpeg`,
-          alt: (n) => `Фото Спорткомплекс 2, 1 этаж, футзал, фото ${n}`,
-        },
-        {
-          key: 'sport-2-2-volleyball',
-          title: '2-й спорткомплекс, 2 этаж, зал волейбола',
-          subtitle: 'фото с 9 по 10',
-          photos: [9, 10],
-          src: (n) => `/images/gallery/photo-${n}-sport-2-volleyball.jpeg`,
-          alt: (n) => `Фото 2-й спорткомплекс, 2 этаж, зал волейбола, фото ${n}`,
-        },
-        {
-          key: 'sport-2-1-tennis',
-          title: '2-й спорткомплекс, 1 этаж, теннисный зал',
-          subtitle: 'последние 3 фото',
-          photos: [9, 10, 11],
-          src: (n) => `/images/gallery/photo-${n}-sport-2-tennis.jpeg`,
-          alt: (n) => `Фото 2-й спорткомплекс, 1 этаж, теннисный зал, фото ${n}`,
-        },
-      ],
     }
   },
   async mounted() {
     try {
       this.venues = await getVenues()
+      this.galleryGroups = await getGallery()
     } finally {
       this.loading = false
     }
   },
   methods: {
-    openLightbox(n) {
-      this.lightbox = n
-      this.lightboxCaption = this.findCaptionFor(n)
-    },
-    findCaptionFor(n) {
-      for (const g of this.galleryGroups) {
-        if (g.photos.includes(n)) {
-          return g.title
-        }
-      }
-      return null
+    openLightbox(src, title) {
+      this.lightbox = src
+      this.lightboxCaption = title
     },
     formatPrice,
   },

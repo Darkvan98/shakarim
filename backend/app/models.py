@@ -43,3 +43,15 @@ class Booking(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     venue: Mapped["Venue"] = relationship(back_populates="bookings")
+
+
+class GalleryGroup(Base):
+    """Группа фото в галерее на главной (например, «Спорткомплекс 1»)."""
+
+    __tablename__ = "gallery_groups"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    title: Mapped[str] = mapped_column(String)                      # заголовок группы
+    subtitle: Mapped[str] = mapped_column(String, default="")       # подпись под заголовком
+    photos: Mapped[str] = mapped_column(String, default="")         # JSON-список путей к фото
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)

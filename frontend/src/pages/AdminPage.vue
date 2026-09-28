@@ -2,6 +2,146 @@
 import { computed, onMounted, ref } from 'vue'
 import { api, formatDateHuman, formatPrice, getVenues } from '../api'
 
+// ----- gallery -----
+const gallery = ref([])
+const galleryEditing = ref(null) // id группы или 'new'
+const galleryForm = ref(emptyGalleryForm())
+const gallerySaving = ref(false)
+const galleryError = ref('')
+const galleryPhotoInput = ref('')
+const galleryFileInputs = ref({})
+const galleryUploading = ref('') // src фото, которое сейчас грузится, или ''
+
+function emptyGalleryForm() {
+  return { title: '', subtitle: '', photos: [], sort_order: 0 }
+}
+
+function startCreateGallery() {
+  const maxOrder = gallery.value.reduce((m, g) => Math.max(m, g.sort_order), 0)
+  galleryForm.value = { ...emptyGalleryForm(), sort_order: maxOrder + 1 }
+  galleryEditing.value = 'new'
+  galleryError.value = ''
+}
+
+function startEditGallery(g) {
+  galleryForm.value = { title: g.title, subtitle: g.subtitle, photos: [...g.photos], sort_order: g.sort_order }
+  galleryEditing.value = g.id
+  galleryError.value = ''
+}
+
+function cancelGalleryForm() {
+  galleryEditing.value = null
+  galleryError.value = ''
+}
+
+function addGalleryPhoto() {
+  const src = galleryPhotoInput.value.trim()
+  if (!src) return
+  if (!galleryForm.value.photos.includes(src)) galleryForm.value.photos.push(src)
+  galleryPhotoInput.value = ''
+}
+
+function removeGalleryPhoto(src) {
+  galleryForm.value.photos = galleryForm.value.photos.filter((p) => p !== src)
+}
+
+function moveGalleryPhoto(idx, dir) {
+  const photos = galleryForm.value.photos
+  const target = idx + dir
+  if (target < 0 || target >= photos.length) return
+  ;[photos[idx], photos[target]] = [photos[target], photos[idx]]
+}
+
+async function uploadGalleryPhoto(file) {
+  if (!file) return
+  galleryUploading.value = 'file'
+  galleryError.value = ''
+  try {
+    const fd = new FormData()
+    fd.append('file', file)
+    const res = await fetch('/api/admin/uploads', {
+      method: 'POST',
+      headers: { 'X-Admin-Token': token.value },
+      body: fd,
+    })
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      throw new Error(data.detail || `Ошибка ${res.status}`)
+    }
+    const { path } = await res.json()
+    galleryForm.value.photos.push(path)
+  } catch (e) {
+    galleryError.value = e.message
+  } finally {
+    galleryUploading.value = ''
+  }
+}
+
+async function replaceGalleryPhoto(idx, file) {
+  if (!file) return
+  galleryUploading.value = galleryForm.value.photos[idx]
+  galleryError.value = ''
+  try {
+    const fd = new FormData()
+    fd.append('file', file)
+    const res = await fetch('/api/admin/uploads', {
+      method: 'POST',
+      headers: { 'X-Admin-Token': token.value },
+      body: fd,
+    })
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      throw new Error(data.detail || `Ошибка ${res.status}`)
+    }
+    const { path } = await res.json()
+    galleryForm.value.photos.splice(idx, 1, path)
+  } catch (e) {
+    galleryError.value = e.message
+  } finally {
+    galleryUploading.value = ''
+  }
+}
+
+async function saveGallery() {
+  gallerySaving.value = true
+  galleryError.value = ''
+  try {
+    const body = JSON.stringify(galleryForm.value)
+    if (galleryEditing.value === 'new') {
+      const created = await api('/api/admin/gallery', { method: 'POST', headers: authHeaders(), body })
+      gallery.value.push(created)
+    } else {
+      const updated = await api(`/api/admin/gallery/${galleryEditing.value}`, {
+        method: 'PATCH',
+        headers: authHeaders(),
+        body,
+      })
+      const idx = gallery.value.findIndex((g) => g.id === updated.id)
+      if (idx >= 0) gallery.value.splice(idx, 1, updated)
+    }
+    galleryEditing.value = null
+  } catch (e) {
+    galleryError.value = e.message
+  } finally {
+    gallerySaving.value = false
+  }
+}
+
+async function removeGalleryGroup(g) {
+  if (!confirm(`Удалить группу «${g.title}» вместе со всеми её фото из галереи?`)) return
+  galleryError.value = ''
+  try {
+    await api(`/api/admin/gallery/${g.id}`, { method: 'DELETE', headers: authHeaders() })
+    gallery.value = gallery.value.filter((x) => x.id !== g.id)
+  } catch (e) {
+    galleryError.value = e.message
+  }
+}
+
+function triggerGalleryFile(idx) {
+  galleryFileInputs.value[idx]?.click()
+}
+
 const token = ref(localStorage.getItem('adminToken') || '')
 const logged = ref(false)
 const password = ref('')
@@ -71,6 +211,7 @@ async function load() {
     bookings.value = await api('/api/admin/bookings', { headers: authHeaders() })
     stats.value = await api('/api/admin/stats', { headers: authHeaders() })
     venues.value = await api('/api/admin/venues', { headers: authHeaders() })
+    gallery.value = await api('/api/gallery')
     logged.value = true
   } catch (e) {
     error.value = e.message
@@ -236,6 +377,9 @@ onMounted(() => {
         <button class="tab" :class="{ active: tab === 'venues' }" @click="tab = 'venues'">
           Залы <span class="tab-count">{{ venues.length }}</span>
         </button>
+        <button class="tab" :class="{ active: tab === 'gallery' }" @click="tab = 'gallery'">
+          Галерея <span class="tab-count">{{ gallery.length }}</span>
+        </button>
       </div>
 
       <!-- ===== BOOKINGS TAB ===== -->
@@ -310,7 +454,7 @@ onMounted(() => {
       </div>
 
       <!-- ===== VENUES TAB ===== -->
-      <div v-else>
+      <div v-else-if="tab === 'venues'">
         <div v-if="venueEditing === null">
           <div class="toolbar venues-toolbar">
             <button class="btn btn-gold" @click="startCreateVenue">+ Добавить зал</button>
@@ -428,6 +572,104 @@ onMounted(() => {
           </div>
         </div>
       </div>
+
+      <!-- ===== GALLERY TAB ===== -->
+      <div v-else-if="tab === 'gallery'">
+        <div v-if="galleryEditing === null">
+          <div class="toolbar venues-toolbar">
+            <button class="btn btn-gold" @click="startCreateGallery">+ Добавить группу</button>
+          </div>
+
+          <div v-if="galleryError" class="alert alert-error">{{ galleryError }}</div>
+
+          <div class="gallery-admin-list">
+            <div v-for="g in gallery" :key="g.id" class="card gallery-admin-card">
+              <div class="gallery-admin-head">
+                <div>
+                  <strong>{{ g.title }}</strong>
+                  <small class="muted"> {{ g.subtitle }}</small>
+                </div>
+                <div class="actions">
+                  <span class="muted small-note">порядок: {{ g.sort_order }}</span>
+                  <button class="btn btn-sm btn-primary" @click="startEditGallery(g)">✎</button>
+                  <button class="btn btn-sm btn-danger" @click="removeGalleryGroup(g)">🗑</button>
+                </div>
+              </div>
+              <div class="gallery-admin-photos">
+                <img v-for="src in g.photos" :key="src" :src="src" :alt="g.title" />
+              </div>
+            </div>
+            <div v-if="gallery.length === 0" class="muted">Групп пока нет</div>
+          </div>
+        </div>
+
+        <!-- gallery edit/create form -->
+        <div v-else class="card venue-form">
+          <h3>{{ galleryEditing === 'new' ? 'Новая группа фото' : `Редактирование: ${galleryForm.title}` }}</h3>
+          <div v-if="galleryError" class="alert alert-error">{{ galleryError }}</div>
+
+          <div class="grid-3">
+            <div class="field">
+              <label>Заголовок *</label>
+              <input v-model="galleryForm.title" placeholder="Спорткомплекс 1" />
+            </div>
+            <div class="field">
+              <label>Подпись</label>
+              <input v-model="galleryForm.subtitle" placeholder="первые 2 фото" />
+            </div>
+            <div class="field">
+              <label>Порядок сортировки</label>
+              <input v-model.number="galleryForm.sort_order" type="number" min="0" />
+            </div>
+          </div>
+
+          <div class="field">
+            <label>Фотографии группы</label>
+            <div class="gallery-edit-photos">
+              <div v-for="(src, idx) in galleryForm.photos" :key="`${src}-${idx}`" class="gallery-edit-item">
+                <img :src="src" alt="Фото группы" />
+                <div class="gallery-edit-controls">
+                  <button class="btn btn-sm btn-outline" :disabled="idx === 0" @click="moveGalleryPhoto(idx, -1)">←</button>
+                  <button class="btn btn-sm btn-outline" :disabled="idx === galleryForm.photos.length - 1" @click="moveGalleryPhoto(idx, 1)">→</button>
+                  <input
+                    ref="galleryFileInputs"
+                    type="file"
+                    accept="image/*"
+                    class="visually-hidden"
+                    @change="replaceGalleryPhoto(idx, $event.target.files[0]); $event.target.value = ''"
+                  />
+                  <button class="btn btn-sm btn-outline" :disabled="galleryUploading !== ''" @click="triggerGalleryFile(idx)">
+                    {{ galleryUploading === galleryForm.photos[idx] ? '…' : '📷' }}
+                  </button>
+                  <button class="btn btn-sm btn-danger" @click="removeGalleryPhoto(src)">✕</button>
+                </div>
+              </div>
+              <div v-if="galleryForm.photos.length === 0" class="muted small-note">Фото пока нет</div>
+            </div>
+
+            <div class="gallery-add-row">
+              <input v-model="galleryPhotoInput" placeholder="/images/gallery/… или URL" @keyup.enter="addGalleryPhoto" />
+              <button class="btn btn-outline" @click="addGalleryPhoto">+ Добавить путь</button>
+              <input
+                type="file"
+                accept="image/*"
+                class="visually-hidden"
+                @change="uploadGalleryPhoto($event.target.files[0]); $event.target.value = ''"
+              />
+              <button class="btn btn-outline" :disabled="galleryUploading !== ''" @click="$event.currentTarget.previousElementSibling.click()">
+                {{ galleryUploading === 'file' ? 'Загружаем…' : '📷 Загрузить файл' }}
+              </button>
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button class="btn btn-primary" :disabled="gallerySaving || !galleryForm.title" @click="saveGallery">
+              {{ gallerySaving ? 'Сохраняем…' : 'Сохранить' }}
+            </button>
+            <button class="btn btn-outline" @click="cancelGalleryForm">Отмена</button>
+          </div>
+        </div>
+      </div>
     </template>
   </div>
 </template>
@@ -474,4 +716,19 @@ th { color: var(--muted); font-size: 12.5px; text-transform: uppercase; letter-s
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 .form-actions { display: flex; gap: 12px; margin-top: 18px; }
 textarea { width: 100%; font: inherit; padding: 10px 12px; border: 1.5px solid var(--gray); border-radius: 10px; resize: vertical; }
+
+/* gallery admin */
+.gallery-admin-list { display: flex; flex-direction: column; gap: 16px; margin-top: 6px; }
+.gallery-admin-card { padding: 16px 20px; }
+.gallery-admin-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+.gallery-admin-head strong { color: var(--navy); }
+.gallery-admin-photos { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.gallery-admin-photos img { width: 100%; height: 100px; object-fit: cover; border-radius: 8px; }
+.gallery-edit-photos { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; }
+.gallery-edit-item { width: 170px; }
+.gallery-edit-item img { width: 100%; height: 110px; object-fit: cover; border-radius: 8px; display: block; }
+.gallery-edit-controls { display: flex; gap: 4px; margin-top: 6px; }
+.gallery-edit-controls .btn { padding: 4px 8px; }
+.gallery-add-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.gallery-add-row input { flex: 1; min-width: 220px; }
 </style>

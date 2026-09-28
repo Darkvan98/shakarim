@@ -114,6 +114,21 @@ class UploadOut(BaseModel):
     path: str
 
 
+class GalleryPhotoIn(BaseModel):
+    src: str = Field(min_length=1, max_length=500)
+
+
+class GalleryGroupPayload(BaseModel):
+    title: str = Field(min_length=1, max_length=200)
+    subtitle: str = Field(default="", max_length=300)
+    photos: list[str] = []
+    sort_order: int = Field(default=0, ge=0, le=10000)
+
+
+class GalleryGroupOut(GalleryGroupPayload):
+    id: int
+
+
 # ---------- Helpers ----------
 
 def to_venue_out(v: models.Venue) -> VenueOut:
@@ -130,6 +145,16 @@ def to_venue_out(v: models.Venue) -> VenueOut:
         features=json.loads(v.features) if v.features else [],
         price_weekday=v.price_weekday,
         price_weekend=v.price_weekend,
+    )
+
+
+def to_gallery_out(g: models.GalleryGroup) -> "GalleryGroupOut":
+    return GalleryGroupOut(
+        id=g.id,
+        title=g.title,
+        subtitle=g.subtitle,
+        photos=json.loads(g.photos) if g.photos else [],
+        sort_order=g.sort_order,
     )
 
 
@@ -273,6 +298,64 @@ def get_booking(code: str, db: Session = Depends(get_db)):
     if not b:
         raise HTTPException(404, "Бронирование не найдено")
     return to_booking_out(b)
+
+
+# ---------- Gallery ----------
+
+@router.get("/gallery", response_model=list[GalleryGroupOut])
+def list_gallery(db: Session = Depends(get_db)):
+    groups = db.scalars(select(models.GalleryGroup).order_by(models.GalleryGroup.sort_order)).all()
+    return [to_gallery_out(g) for g in groups]
+
+
+@router.post("/admin/gallery", response_model=GalleryGroupOut, status_code=201)
+def admin_create_gallery_group(
+    payload: GalleryGroupPayload,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin),
+):
+    group = models.GalleryGroup(
+        title=payload.title,
+        subtitle=payload.subtitle,
+        photos=json.dumps(payload.photos, ensure_ascii=False),
+        sort_order=payload.sort_order,
+    )
+    db.add(group)
+    db.commit()
+    db.refresh(group)
+    return to_gallery_out(group)
+
+
+@router.patch("/admin/gallery/{group_id}", response_model=GalleryGroupOut)
+def admin_update_gallery_group(
+    group_id: int,
+    payload: GalleryGroupPayload,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin),
+):
+    group = db.get(models.GalleryGroup, group_id)
+    if not group:
+        raise HTTPException(404, "Группа не найдена")
+    group.title = payload.title
+    group.subtitle = payload.subtitle
+    group.photos = json.dumps(payload.photos, ensure_ascii=False)
+    group.sort_order = payload.sort_order
+    db.commit()
+    db.refresh(group)
+    return to_gallery_out(group)
+
+
+@router.delete("/admin/gallery/{group_id}", status_code=204)
+def admin_delete_gallery_group(
+    group_id: int,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin),
+):
+    group = db.get(models.GalleryGroup, group_id)
+    if not group:
+        raise HTTPException(404, "Группа не найдена")
+    db.delete(group)
+    db.commit()
 
 
 def generate_code() -> str:
@@ -539,6 +622,64 @@ def _ensure_db():
             ),
         ]
         db.add_all(venues)
+        db.commit()
+
+        gallery = [
+            models.GalleryGroup(
+                title="Спорткомплекс 1",
+                subtitle="первые 2 фото",
+                photos=json.dumps(
+                    [
+                        "/images/gallery/photo-1-sport-1.jpeg",
+                        "/images/gallery/photo-2-sport-1.jpeg",
+                    ],
+                    ensure_ascii=False,
+                ),
+                sort_order=1,
+            ),
+            models.GalleryGroup(
+                title="Спорткомплекс 2, 1 этаж, футзал",
+                subtitle="фото с 3 по 8",
+                photos=json.dumps(
+                    [
+                        "/images/gallery/photo-3-sport-2-football.jpeg",
+                        "/images/gallery/photo-4-sport-2-football.jpeg",
+                        "/images/gallery/photo-5-sport-2-football.jpeg",
+                        "/images/gallery/photo-6-sport-2-football.jpeg",
+                        "/images/gallery/photo-7-sport-2-football.jpeg",
+                        "/images/gallery/photo-8-sport-2-football.jpeg",
+                    ],
+                    ensure_ascii=False,
+                ),
+                sort_order=2,
+            ),
+            models.GalleryGroup(
+                title="2-й спорткомплекс, 2 этаж, зал волейбола",
+                subtitle="фото с 9 по 10",
+                photos=json.dumps(
+                    [
+                        "/images/gallery/photo-9-sport-2-volleyball.jpeg",
+                        "/images/gallery/photo-10-sport-2-volleyball.jpeg",
+                    ],
+                    ensure_ascii=False,
+                ),
+                sort_order=3,
+            ),
+            models.GalleryGroup(
+                title="2-й спорткомплекс, 1 этаж, теннисный зал",
+                subtitle="последние 3 фото",
+                photos=json.dumps(
+                    [
+                        "/images/gallery/photo-9-sport-2-tennis.jpeg",
+                        "/images/gallery/photo-10-sport-2-tennis.jpeg",
+                        "/images/gallery/photo-11-sport-2-tennis.jpeg",
+                    ],
+                    ensure_ascii=False,
+                ),
+                sort_order=4,
+            ),
+        ]
+        db.add_all(gallery)
         db.commit()
         _db_initialized = True
     finally:
