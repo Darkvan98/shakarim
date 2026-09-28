@@ -300,6 +300,13 @@ def get_booking(code: str, db: Session = Depends(get_db)):
     return to_booking_out(b)
 
 
+# ---------- Admin auth ----------
+
+def require_admin(x_admin_token: str = Header(default="")):
+    if x_admin_token != ADMIN_TOKEN:
+        raise HTTPException(401, "Неверный админ-токен")
+
+
 # ---------- Gallery ----------
 
 @router.get("/gallery", response_model=list[GalleryGroupOut])
@@ -365,11 +372,6 @@ def generate_code() -> str:
 
 
 # ---------- Admin endpoints ----------
-
-def require_admin(x_admin_token: str = Header(default="")):
-    if x_admin_token != ADMIN_TOKEN:
-        raise HTTPException(401, "Неверный админ-токен")
-
 
 SLUG_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 
