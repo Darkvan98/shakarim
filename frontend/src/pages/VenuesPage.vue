@@ -1,11 +1,11 @@
 <script setup>
 import { ref } from 'vue'
-import { getVenues, getOccupied, formatDateHuman, formatPrice } from '../api'
+import { getSchedule, getVenues, formatDateHuman, formatPrice } from '../api'
 
 const venues = ref([])
 const loading = ref(true)
 const expanded = ref(null)
-const occupied = ref([])
+const schedule = ref([])
 const occLoading = ref(false)
 const occDate = ref(new Date().toISOString().slice(0, 10))
 
@@ -17,17 +17,17 @@ async function toggle(v) {
   expanded.value = v.id
   occLoading.value = true
   try {
-    occupied.value = await getOccupied(v.id, occDate.value)
+    schedule.value = await getSchedule(v.id, occDate.value)
   } finally {
     occLoading.value = false
   }
 }
 
-async function refreshOccupied() {
+async function refreshSchedule() {
   if (expanded.value == null) return
   occLoading.value = true
   try {
-    occupied.value = await getOccupied(expanded.value, occDate.value)
+    schedule.value = await getSchedule(expanded.value, occDate.value)
   } finally {
     occLoading.value = false
   }
@@ -84,18 +84,23 @@ getVenues()
           <div class="occ-head">
             <label>
               Дата:
-              <input type="date" v-model="occDate" :min="new Date().toISOString().slice(0, 10)" @change="refreshOccupied" />
+              <input type="date" v-model="occDate" :min="new Date().toISOString().slice(0, 10)" @change="refreshSchedule" />
             </label>
             <span class="muted">{{ formatDateHuman(occDate) }}</span>
           </div>
           <div v-if="occLoading" class="muted">Загрузка расписания…</div>
-          <div v-else-if="occupied.length === 0" class="success-text">
+          <div v-else-if="schedule.length === 0" class="success-text">
             На эту дату всё свободно — можно бронировать любое время 08:00–22:00!
           </div>
           <div v-else class="occ-slots">
-            <div v-for="s in occupied" :key="s.start_time" class="occ-slot" :class="s.status">
-              {{ s.start_time }}–{{ s.end_time }}
-              <small>{{ s.status === 'pending' ? 'ожидает подтверждения' : 'подтверждено' }}</small>
+            <div
+              v-for="s in schedule"
+              :key="s.start_time + s.end_time"
+              class="occ-slot"
+              :class="s.kind"
+            >
+              <span class="occ-time">{{ s.start_time }}–{{ s.end_time }}</span>
+              <small>{{ s.label }}</small>
             </div>
           </div>
         </div>
@@ -142,10 +147,26 @@ getVenues()
   display: flex;
   flex-direction: column;
   font-size: 14px;
+  min-width: 120px;
 }
-.occ-slot small { font-weight: 500; font-size: 11.5px; }
-.occ-slot.pending { background: #fdf3d7; color: #8a6d1a; }
-.occ-slot.confirmed { background: #fbe4e4; color: #8a2020; }
+.occ-slot .occ-time { font-size: 14px; }
+.occ-slot small {
+  font-weight: 500;
+  font-size: 11.5px;
+  margin-top: 4px;
+}
+.occ-slot.free {
+  background: #fff;
+  color: var(--muted);
+  border: 1px dashed var(--gray);
+}
+.occ-slot.free small { color: var(--muted); }
+.occ-slot.occupied {
+  background: #fde0e0;
+  color: #8a1f1f;
+  border: 1px solid #e9b3b3;
+}
+.occ-slot.occupied small { color: #a12626; }
 
 @media (max-width: 820px) {
   .venue-row { grid-template-columns: 1fr; }

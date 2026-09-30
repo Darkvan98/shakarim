@@ -40,6 +40,10 @@ export function getOccupied(venueId, date) {
   return api(`/api/bookings/occupied?venue_id=${venueId}&date=${date}`)
 }
 
+export function getSchedule(venueId, date) {
+  return api(`/api/venues/${venueId}/schedule?date=${date}`)
+}
+
 export function createBooking(payload) {
   return api('/api/bookings', { method: 'POST', body: JSON.stringify(payload) })
 }

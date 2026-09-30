@@ -277,6 +277,75 @@ def occupied_slots(
     ]
 
 
+class ScheduleBlock(BaseModel):
+    start_time: str
+    end_time: str
+    kind: str  # "free" | "occupied"
+    label: str = ""
+
+
+@router.get("/venues/{venue_id}/schedule", response_model=list[ScheduleBlock])
+def venue_schedule(
+    venue_id: int,
+    date: str = Query(..., pattern=r"^\d{4}-\d{2}-\d{2}$"),
+    db: Session = Depends(get_db),
+):
+    """Полное расписание зала на дату: 08:00–22:00, с дырками (свободное) и красными блоками (занято)."""
+    d = validate_date(date)
+
+    venue = db.get(models.Venue, venue_id)
+    if not venue:
+        raise HTTPException(404, "Зал не найден")
+
+    start_min = OPEN_HOUR * 60
+    end_min = CLOSE_HOUR * 60
+
+    stmt = select(models.Booking).where(
+        models.Booking.venue_id == venue_id,
+        models.Booking.date == date,
+        models.Booking.status.in_(["pending", "confirmed"]),
+    ).order_by(models.Booking.start_time)
+    bookings = list(db.scalars(stmt))
+
+    # сводим перекрывающиеся/касающиеся брони в один занятый блок
+    occupied = []
+    for b in bookings:
+        s = parse_hm(b.start_time)
+        e = parse_hm(b.end_time)
+        if s < end_min and e > start_min:  # внутри рабочего дня
+            if occupied and s <= occupied[-1]["end"]:
+                occupied[-1]["end"] = max(occupied[-1]["end"], e)
+            else:
+                occupied.append({"start": s, "end": e})
+
+    blocks: list[ScheduleBlock] = []
+    cursor = start_min
+    for s, e in occupied:
+        if cursor < s:
+            blocks.append(ScheduleBlock(
+                start_time=minutes_to_hm(cursor),
+                end_time=minutes_to_hm(s),
+                kind="free",
+                label="свободно",
+            ))
+        blocks.append(ScheduleBlock(
+            start_time=minutes_to_hm(s),
+            end_time=minutes_to_hm(e),
+            kind="occupied",
+            label="занято",
+        ))
+        cursor = e
+    if cursor < end_min:
+        blocks.append(ScheduleBlock(
+            start_time=minutes_to_hm(cursor),
+            end_time=minutes_to_hm(end_min),
+            kind="free",
+            label="свободно",
+        ))
+
+    return blocks
+
+
 @router.post("/bookings", response_model=BookingOut, status_code=201)
 def create_booking(payload: BookingCreate, db: Session = Depends(get_db)):
     d = validate_date(payload.date)
