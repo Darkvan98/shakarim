@@ -176,7 +176,7 @@ function onPhoneInput(e) {
       countryCode = '+7'
       digits = afterPlus.slice(1)
     } else {
-      countryCode = cleaned.startsWith('+') ? '+' : ''
+      countryCode = '+'
       digits = afterPlus
     }
   } else if (cleaned.startsWith('7')) {
@@ -195,19 +195,19 @@ function onPhoneInput(e) {
   const isRemoval = digits.length < prevDigitCount.value
   prevDigitCount.value = digits.length
 
-  // Форматируем только если есть цифры номера
+  // Форматируем: скобки и тире появляются только когда есть минимум 3 цифры номера
   if (digits.length === 0) {
     phone.value = countryCode || cleaned
     return
   }
 
-  const formatted = countryCode + ' (' + digits.slice(0, 3) + ') ' + digits.slice(3, 6) + '-' + digits.slice(6, 8) + '-' + digits.slice(8, 10)
-
-  if (isRemoval && phone.value.length > 0) {
-    phone.value = phone.value.slice(0, -1)
-  } else {
-    phone.value = formatted
+  if (digits.length < 3) {
+    phone.value = countryCode + ' (' + digits + ')'
+    return
   }
+
+  const formatted = countryCode + ' (' + digits.slice(0, 3) + ') ' + digits.slice(3, 6) + '-' + digits.slice(6, 8) + '-' + digits.slice(8, 10)
+  phone.value = formatted
 }
 
 async function submit() {
