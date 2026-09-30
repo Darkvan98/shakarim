@@ -71,17 +71,34 @@ function intervalOverlaps(startMin, endMin) {
   })
 }
 
-// Статус конкретного часа: занят, если сам час перекрывается с броней.
-// Не зависит от hours.value.
-const slotState = computed(() => {
+function formatTime(minutes) {
+  const h = Math.floor(minutes / 60)
+  const m = minutes % 60
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+}
+
+// Информация о каждом часе: статус и до скольки занято (если перекрыт броней).
+const slotInfo = computed(() => {
   const map = {}
   for (const s of allSlots.value) {
     const [h] = s.split(':').map(Number)
     const slotStart = h * 60
     const slotEnd = slotStart + 60
-    let state = 'free'
-    if (intervalOverlaps(slotStart, slotEnd)) state = 'busy'
-    map[s] = state
+    let occupiedUntil = null
+    for (const b of occupied.value) {
+      const [bh, bm] = b.start_time.split(':').map(Number)
+      const [eh, em] = b.end_time.split(':').map(Number)
+      const bStart = bh * 60 + bm
+      const bEnd = eh * 60 + em
+      if (slotStart < bEnd && slotEnd > bStart) {
+        // час перекрыт этой броней — возьмём максимальный bEnd среди перекрывающих
+        if (bEnd > (occupiedUntil || 0)) occupiedUntil = bEnd
+      }
+    }
+    map[s] = {
+      status: occupiedUntil ? 'busy' : 'free',
+      occupiedUntil,
+    }
   }
   return map
 })
@@ -111,9 +128,9 @@ const canBook = computed(() => canStartAt.value)
 
 watch(start, (newStart) => {
   // если выбранный час занят — найдём ближайший свободный после него
-  if (slotState.value[newStart] !== 'free') {
+  if (slotInfo.value[newStart] && slotInfo.value[newStart].status !== 'free') {
     const idx = allSlots.value.indexOf(newStart)
-    const replacement = allSlots.value.slice(idx + 1).find((s) => slotState.value[s] === 'free')
+    const replacement = allSlots.value.slice(idx + 1).find((s) => slotInfo.value[s].status === 'free')
     if (replacement) start.value = replacement
   }
   // если при текущем start и hours валидация не проходит — подберём ближайший подходящий
@@ -188,12 +205,13 @@ onMounted(async () => {
           <div class="field">
             <label>Начало</label>
             <select v-model="start">
-              <option v-for="(state, s) in slotState" :key="s" :value="s" :disabled="state !== 'free'">
-                {{ s }} {{ state === 'busy' ? '— занято' : state === 'closed' ? '— не хватает времени до закрытия' : '— свободно' }}
+              <option v-for="(info, s) in slotInfo" :key="s" :value="s" :disabled="info.status !== 'free'">
+                {{ s }}
+                {{ info.status === 'busy' ? '— занято до ' + formatTime(info.occupiedUntil) : '— свободно' }}
               </option>
             </select>
             <small v-if="!canBook" class="error-text">
-              {{ slotState[start.value] === 'busy' ? 'Этот час занят' : 'Не хватает времени до закрытия' }}
+              {{ slotInfo[start.value]?.status === 'busy' ? 'Этот час занят' : 'Не хватает времени до закрытия' }}
             </small>
           </div>
           <div class="field">
