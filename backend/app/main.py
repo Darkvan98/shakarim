@@ -290,7 +290,8 @@ def venue_schedule(
     date: str = Query(..., pattern=r"^\d{4}-\d{2}-\d{2}$"),
     db: Session = Depends(get_db),
 ):
-    """Полное расписание зала на дату: 08:00–22:00, с дырками (свободное) и красными блоками (занято)."""
+    """Почасовая разбивка 08:00–22:00. Каждый час — отдельный блок.
+    Занято, если есть бронь (pending/confirmed), перекрывающая этот час хотя бы на минуту."""
     d = validate_date(date)
 
     venue = db.get(models.Venue, venue_id)
@@ -304,45 +305,30 @@ def venue_schedule(
         models.Booking.venue_id == venue_id,
         models.Booking.date == date,
         models.Booking.status.in_(["pending", "confirmed"]),
-    ).order_by(models.Booking.start_time)
+    )
     bookings = list(db.scalars(stmt))
 
-    # сводим перекрывающиеся/касающиеся брони в один занятый блок
-    occupied = []
-    for b in bookings:
-        s = parse_hm(b.start_time)
-        e = parse_hm(b.end_time)
-        if s < end_min and e > start_min:  # внутри рабочего дня
-            if occupied and s <= occupied[-1]["end"]:
-                occupied[-1]["end"] = max(occupied[-1]["end"], e)
-            else:
-                occupied.append({"start": s, "end": e})
+    # проставь флаг занятости по каждому часовому слоту
+    occupied_hours: dict[int, bool] = {}
+    for h in range(OPEN_HOUR, CLOSE_HOUR):
+        slot_start = h * 60
+        slot_end = slot_start + 60
+        for b in bookings:
+            bs = parse_hm(b.start_time)
+            be = parse_hm(b.end_time)
+            if bs < slot_end and be > slot_start:
+                occupied_hours[h] = True
+                break
 
-    blocks: list[ScheduleBlock] = []
-    cursor = start_min
-    for s, e in occupied:
-        if cursor < s:
-            blocks.append(ScheduleBlock(
-                start_time=minutes_to_hm(cursor),
-                end_time=minutes_to_hm(s),
-                kind="free",
-                label="свободно",
-            ))
-        blocks.append(ScheduleBlock(
-            start_time=minutes_to_hm(s),
-            end_time=minutes_to_hm(e),
-            kind="occupied",
-            label="занято",
-        ))
-        cursor = e
-    if cursor < end_min:
-        blocks.append(ScheduleBlock(
-            start_time=minutes_to_hm(cursor),
-            end_time=minutes_to_hm(end_min),
-            kind="free",
-            label="свободно",
-        ))
-
+    blocks = [
+        ScheduleBlock(
+            start_time=minutes_to_hm(h * 60),
+            end_time=minutes_to_hm(h * 60 + 60),
+            kind="occupied" if occupied_hours.get(h) else "free",
+            label="занято" if occupied_hours.get(h) else "свободно",
+        )
+        for h in range(OPEN_HOUR, CLOSE_HOUR)
+    ]
     return blocks
 
 
