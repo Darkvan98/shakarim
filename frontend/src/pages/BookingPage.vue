@@ -23,6 +23,7 @@ const loadingSlots = ref(false)
 const submitting = ref(false)
 const error = ref('')
 const phoneWarning = ref('')
+const prevDigitCount = ref(0)
 const booking = ref(null)
 
 const today = new Date().toISOString().slice(0, 10)
@@ -155,6 +156,7 @@ function onPhoneInput(e) {
 
   if (cleaned === '') {
     phoneWarning.value = 'Введите номер телефона цифрами'
+    prevDigitCount.value = 0
     phone.value = ''
     return
   }
@@ -164,22 +166,47 @@ function onPhoneInput(e) {
     phoneWarning.value = 'В номере телефона буквы не используются — оставлены только цифры'
   }
 
-  let digits
+  // Определяем: код страны и цифры номера
+  let countryCode = ''
+  let digits = ''
+
   if (cleaned.startsWith('+')) {
+    const afterPlus = cleaned.slice(1)
+    if (afterPlus.startsWith('7')) {
+      countryCode = '+7'
+      digits = afterPlus.slice(1)
+    } else {
+      countryCode = cleaned.startsWith('+') ? '+' : ''
+      digits = afterPlus
+    }
+  } else if (cleaned.startsWith('7')) {
+    countryCode = '+7'
     digits = cleaned.slice(1)
-  } else if (cleaned.startsWith('7') || cleaned.startsWith('8')) {
+  } else if (cleaned.startsWith('8')) {
+    countryCode = '+7'
     digits = cleaned.slice(1)
-    phone.value = '+7 (' + digits.slice(0, 3) + ') ' + digits.slice(3, 6) + '-' + digits.slice(6, 8) + '-' + digits.slice(8, 10)
-    return
   } else {
     digits = cleaned
   }
 
+  // Ограничиваем номер 10 цифрами
   if (digits.length > 10) digits = digits.slice(0, 10)
-  if (cleaned.startsWith('7') || cleaned.startsWith('8') || cleaned.startsWith('+')) {
-    phone.value = '+7 (' + digits.slice(0, 3) + ') ' + digits.slice(3, 6) + '-' + digits.slice(6, 8) + '-' + digits.slice(8, 10)
+
+  const isRemoval = digits.length < prevDigitCount.value
+  prevDigitCount.value = digits.length
+
+  // Форматируем только если есть цифры номера
+  if (digits.length === 0) {
+    phone.value = countryCode || cleaned
+    return
+  }
+
+  const formatted = countryCode + ' (' + digits.slice(0, 3) + ') ' + digits.slice(3, 6) + '-' + digits.slice(6, 8) + '-' + digits.slice(8, 10)
+
+  if (isRemoval && phone.value.length > 0) {
+    phone.value = phone.value.slice(0, -1)
   } else {
-    phone.value = digits
+    phone.value = formatted
   }
 }
 
