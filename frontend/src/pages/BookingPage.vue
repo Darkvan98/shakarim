@@ -233,7 +233,13 @@ onMounted(async () => {
           </div>
           <div class="field">
             <label>Телефон *</label>
-            <input v-model="phone" placeholder="+7 (7XX) XXX-XX-XX" />
+            <input
+              type="tel"
+              v-model="phone"
+              @input="(e) => { phone.value = e.target.value.replace(/[^0-9+]/g, '') }"
+              placeholder="+7 7XX XXX XX XX"
+              maxlength="15"
+            />
           </div>
           <div class="field">
             <label>Комментарий</label>
