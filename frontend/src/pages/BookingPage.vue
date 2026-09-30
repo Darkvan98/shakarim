@@ -195,19 +195,26 @@ function onPhoneInput(e) {
   const isRemoval = digits.length < prevDigitCount.value
   prevDigitCount.value = digits.length
 
-  // Форматируем: скобки и тире появляются только когда есть минимум 3 цифры номера
+  // Форматируем: скобки появляются когда есть минимум 3 цифры, тире — когда больше 6
   if (digits.length === 0) {
     phone.value = countryCode || cleaned
     return
   }
 
+  let formatted
   if (digits.length < 3) {
-    phone.value = countryCode + ' (' + digits + ')'
-    return
+    formatted = (countryCode ? countryCode + ' ' : '') + '(' + digits + ')'
+  } else {
+    formatted = (countryCode ? countryCode + ' ' : '') + '(' + digits.slice(0, 3) + ')'
+    if (digits.length > 3) formatted += ' ' + digits.slice(3, 6)
+    if (digits.length > 6) formatted += '-' + digits.slice(6, 8)
+    if (digits.length > 8) formatted += '-' + digits.slice(8, 10)
   }
 
-  const formatted = countryCode + ' (' + digits.slice(0, 3) + ') ' + digits.slice(3, 6) + '-' + digits.slice(6, 8) + '-' + digits.slice(8, 10)
-  phone.value = formatted
+  // Если formatted совпадает с текущим значением — не обновляем (избегаем дублирования)
+  if (formatted !== phone.value) {
+    phone.value = formatted
+  }
 }
 
 async function submit() {
@@ -298,7 +305,7 @@ onMounted(async () => {
             <label>Телефон *</label>
             <input
               type="tel"
-              :value="phone"
+              v-model="phone"
               @input="onPhoneInput"
               placeholder="+7 (7XX) XXX-XX-XX"
             />
