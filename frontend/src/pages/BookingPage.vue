@@ -96,16 +96,24 @@ async function loadOccupied() {
 }
 
 watch([venueId, dateStr], loadOccupied)
-watch(hours, () => {
-  // при изменении длительности старт может стать невалидным
-  if (slotState.value[start.value] !== 'free') {
-    const firstFree = allSlots.value.find((s) => slotState.value[s] === 'free')
-    if (firstFree) start.value = firstFree
+
+const canBook = computed(() => slotState.value[start.value] === 'free')
+
+watch(start, (newStart) => {
+  // если выбранный час занят для текущих часов — найдём ближайший свободный после него
+  if (slotState.value[newStart] !== 'free') {
+    const idx = allSlots.value.indexOf(newStart)
+    const replacement = allSlots.value.slice(idx + 1).find((s) => slotState.value[s] === 'free')
+    if (replacement) start.value = replacement
   }
 })
 
 async function submit() {
   error.value = ''
+  if (!canBook.value) {
+    error.value = 'Это время уже занято — выберите другое.'
+    return
+  }
   submitting.value = true
   try {
     booking.value = await createBooking({
@@ -162,6 +170,8 @@ onMounted(async () => {
                 {{ s }} {{ state === 'busy' ? '— занято' : state === 'closed' ? '— не хватает времени до закрытия' : '— свободно' }}
               </option>
             </select>
+            <small v-if="!canBook && slotState[start] === 'busy'" class="error-text">Это время занято</small>
+            <small v-else-if="!canBook && slotState[start] === 'closed'" class="error-text">Не хватает времени до закрытия</small>
           </div>
           <div class="field">
             <label>Длительность</label>
