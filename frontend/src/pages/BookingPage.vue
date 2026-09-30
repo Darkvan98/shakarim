@@ -22,6 +22,7 @@ const occupied = ref([])
 const loadingSlots = ref(false)
 const submitting = ref(false)
 const error = ref('')
+const phoneWarning = ref('')
 const booking = ref(null)
 
 const today = new Date().toISOString().slice(0, 10)
@@ -148,14 +149,34 @@ watch(start, (newStart) => {
 })
 
 function onPhoneInput(e) {
-  let raw = e.target.value.replace(/[^0-9]/g, '')
-  // если в начале стоит 7 или 8 — считаем это кодом страны, ставим +7
-  let digits = raw.startsWith('7') || raw.startsWith('8') ? raw.slice(1) : raw
-  if (raw.startsWith('+')) {
-    digits = raw.slice(1)
+  const raw = e.target.value
+  const cleaned = raw.replace(/[^0-9+]/g, '')
+  phoneWarning.value = ''
+
+  if (cleaned === '') {
+    phoneWarning.value = 'Введите номер телефона цифрами'
+    phone.value = ''
+    return
   }
+
+  const hasLetters = raw.replace(/[^a-zA-Z]/g, '') !== ''
+  if (hasLetters) {
+    phoneWarning.value = 'В номере телефона буквы не используются — оставлены только цифры'
+  }
+
+  let digits
+  if (cleaned.startsWith('+')) {
+    digits = cleaned.slice(1)
+  } else if (cleaned.startsWith('7') || cleaned.startsWith('8')) {
+    digits = cleaned.slice(1)
+    phone.value = '+7 (' + digits.slice(0, 3) + ') ' + digits.slice(3, 6) + '-' + digits.slice(6, 8) + '-' + digits.slice(8, 10)
+    return
+  } else {
+    digits = cleaned
+  }
+
   if (digits.length > 10) digits = digits.slice(0, 10)
-  if (raw.startsWith('7') || raw.startsWith('8') || raw.startsWith('+')) {
+  if (cleaned.startsWith('7') || cleaned.startsWith('8') || cleaned.startsWith('+')) {
     phone.value = '+7 (' + digits.slice(0, 3) + ') ' + digits.slice(3, 6) + '-' + digits.slice(6, 8) + '-' + digits.slice(8, 10)
   } else {
     phone.value = digits
@@ -254,6 +275,7 @@ onMounted(async () => {
               @input="onPhoneInput"
               placeholder="+7 (7XX) XXX-XX-XX"
             />
+            <small v-if="phoneWarning" class="error-text">{{ phoneWarning }}</small>
           </div>
           <div class="field">
             <label>Комментарий</label>
