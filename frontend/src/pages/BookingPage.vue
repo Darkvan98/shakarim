@@ -60,7 +60,7 @@ const allSlots = computed(() => {
   return slots
 })
 
-// Проверка пересечения выбранного интервала с занятыми
+// Проверка пересечения интервала с занятыми
 function intervalOverlaps(startMin, endMin) {
   return occupied.value.some((b) => {
     const [bh, bm] = b.start_time.split(':').map(Number)
@@ -71,18 +71,28 @@ function intervalOverlaps(startMin, endMin) {
   })
 }
 
+// Статус конкретного часа: занят, если сам час перекрывается с броней.
+// Не зависит от hours.value.
 const slotState = computed(() => {
   const map = {}
   for (const s of allSlots.value) {
     const [h] = s.split(':').map(Number)
-    const startMin = h * 60
-    const endMin = startMin + hours.value * 60
+    const slotStart = h * 60
+    const slotEnd = slotStart + 60
     let state = 'free'
-    if (endMin > CLOSE_HOUR * 60) state = 'closed'
-    else if (intervalOverlaps(startMin, endMin)) state = 'busy'
+    if (intervalOverlaps(slotStart, slotEnd)) state = 'busy'
     map[s] = state
   }
   return map
+})
+
+// Можно ли начать бронирование с выбранного часа на выбранную длительность
+const canStartAt = computed(() => {
+  const [h] = start.value.split(':').map(Number)
+  const startMin = h * 60
+  const endMin = startMin + hours.value * 60
+  if (endMin > CLOSE_HOUR * 60) return false
+  return !intervalOverlaps(startMin, endMin)
 })
 
 async function loadOccupied() {
@@ -97,14 +107,26 @@ async function loadOccupied() {
 
 watch([venueId, dateStr], loadOccupied)
 
-const canBook = computed(() => slotState.value[start.value] === 'free')
+const canBook = computed(() => canStartAt.value)
 
 watch(start, (newStart) => {
-  // если выбранный час занят для текущих часов — найдём ближайший свободный после него
+  // если выбранный час занят — найдём ближайший свободный после него
   if (slotState.value[newStart] !== 'free') {
     const idx = allSlots.value.indexOf(newStart)
     const replacement = allSlots.value.slice(idx + 1).find((s) => slotState.value[s] === 'free')
     if (replacement) start.value = replacement
+  }
+  // если при текущем start и hours валидация не проходит — подберём ближайший подходящий
+  if (!canStartAt.value) {
+    for (const s of allSlots.value) {
+      const [h] = s.split(':').map(Number)
+      const startMin = h * 60
+      const endMin = startMin + hours.value * 60
+      if (endMin <= CLOSE_HOUR * 60 && !intervalOverlaps(startMin, endMin)) {
+        start.value = s
+        break
+      }
+    }
   }
 })
 
@@ -170,8 +192,9 @@ onMounted(async () => {
                 {{ s }} {{ state === 'busy' ? '— занято' : state === 'closed' ? '— не хватает времени до закрытия' : '— свободно' }}
               </option>
             </select>
-            <small v-if="!canBook && slotState[start] === 'busy'" class="error-text">Это время занято</small>
-            <small v-else-if="!canBook && slotState[start] === 'closed'" class="error-text">Не хватает времени до закрытия</small>
+            <small v-if="!canBook" class="error-text">
+              {{ slotState[start.value] === 'busy' ? 'Этот час занят' : 'Не хватает времени до закрытия' }}
+            </small>
           </div>
           <div class="field">
             <label>Длительность</label>
