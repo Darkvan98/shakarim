@@ -147,6 +147,21 @@ watch(start, (newStart) => {
   }
 })
 
+function onPhoneInput(e) {
+  let raw = e.target.value.replace(/[^0-9]/g, '')
+  // если в начале стоит 7 или 8 — считаем это кодом страны, ставим +7
+  let digits = raw.startsWith('7') || raw.startsWith('8') ? raw.slice(1) : raw
+  if (raw.startsWith('+')) {
+    digits = raw.slice(1)
+  }
+  if (digits.length > 10) digits = digits.slice(0, 10)
+  if (raw.startsWith('7') || raw.startsWith('8') || raw.startsWith('+')) {
+    phone.value = '+7 (' + digits.slice(0, 3) + ') ' + digits.slice(3, 6) + '-' + digits.slice(6, 8) + '-' + digits.slice(8, 10)
+  } else {
+    phone.value = digits
+  }
+}
+
 async function submit() {
   error.value = ''
   if (!canBook.value) {
@@ -235,10 +250,9 @@ onMounted(async () => {
             <label>Телефон *</label>
             <input
               type="tel"
-              v-model="phone"
-              @input="(e) => { phone.value = e.target.value.replace(/[^0-9+]/g, '') }"
-              placeholder="+7 7XX XXX XX XX"
-              maxlength="15"
+              :value="phone"
+              @input="onPhoneInput"
+              placeholder="+7 (7XX) XXX-XX-XX"
             />
           </div>
           <div class="field">
