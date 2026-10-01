@@ -1,7 +1,7 @@
 <script setup>
 import { onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { formatDateHuman, formatPrice, getBooking } from '../api'
+import { formatDateHuman, getBooking } from '../api'
 
 const route = useRoute()
 const booking = ref(null)
@@ -43,7 +43,7 @@ const statusLabels = {
         <li><span>Дата</span><strong>{{ formatDateHuman(booking.date) }}</strong></li>
         <li><span>Время</span><strong>{{ booking.start_time }}–{{ booking.end_time }}</strong></li>
         <li><span>Длительность</span><strong>{{ booking.hours }} ч</strong></li>
-        <li><span>Итого к оплате на месте</span><strong>{{ formatPrice(booking.total_price) }}</strong></li>
+
         <li><span>Имя</span><strong>{{ booking.customer_name }}</strong></li>
         <li><span>Телефон</span><strong>{{ booking.phone }}</strong></li>
       </ul>

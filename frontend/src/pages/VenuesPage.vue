@@ -1,6 +1,6 @@
 <script setup>
 import { ref } from 'vue'
-import { getSchedule, getVenues, formatDateHuman, formatPrice } from '../api'
+import { getSchedule, getVenues, formatDateHuman } from '../api'
 
 const venues = ref([])
 const loading = ref(true)
@@ -55,19 +55,9 @@ getVenues()
             <div class="features">
               <span v-for="f in v.features" :key="f" class="feature">{{ f }}</span>
             </div>
-            <div class="prices">
-              <div class="price-box">
-                <small>Будни (пн–пт)</small>
-                <strong>{{ formatPrice(v.price_weekday) }}/час</strong>
-              </div>
-              <div class="price-box">
-                <small>Выходные (сб–вс)</small>
-                <strong>{{ formatPrice(v.price_weekend) }}/час</strong>
-              </div>
-              <div class="price-box">
-                <small>Вместимость</small>
-                <strong>до {{ v.capacity }} чел.</strong>
-              </div>
+            <div class="features" style="width:100%">
+              <span v-for="f in v.features" :key="f" class="feature">{{ f }}</span>
+              <span class="feature">до {{ v.capacity }} чел.</span>
             </div>
             <div class="venue-actions">
               <router-link :to="{ path: '/booking', query: { venue: v.slug } }" class="btn btn-primary">
@@ -123,17 +113,6 @@ getVenues()
   font-size: 13px;
   font-weight: 600;
 }
-.prices { display: flex; gap: 18px; flex-wrap: wrap; margin-bottom: 18px; }
-.price-box {
-  background: var(--bg);
-  border: 1px solid var(--gray);
-  border-radius: 10px;
-  padding: 10px 16px;
-  display: flex;
-  flex-direction: column;
-}
-.price-box small { color: var(--muted); }
-.price-box strong { color: var(--navy); font-size: 17px; }
 .venue-actions { display: flex; gap: 12px; flex-wrap: wrap; }
 
 .occupancy { border-top: 1px dashed var(--gray); padding: 18px 26px 24px; background: #fbfbfa; }

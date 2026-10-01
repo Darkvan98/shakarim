@@ -1,6 +1,6 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { api, formatDateHuman, formatPrice, getVenues } from '../api'
+import { api, formatDateHuman, getVenues } from '../api'
 
 // ----- gallery -----
 const gallery = ref([])
@@ -203,8 +203,6 @@ function emptyVenueForm() {
     area_m2: 0,
     image: '',
     features: [],
-    price_weekday: 0,
-    price_weekend: 0,
     sort_order: 0,
   }
 }
@@ -465,10 +463,7 @@ onMounted(() => {
             <span class="muted">Подтверждено</span>
             <strong class="ok">{{ stats.confirmed }}</strong>
           </div>
-          <div class="card stat">
-            <span class="muted">Ожидаемая выручка</span>
-            <strong>{{ formatPrice(stats.revenue) }}</strong>
-          </div>
+
         </div>
 
         <div class="toolbar">
@@ -536,7 +531,6 @@ onMounted(() => {
                 <tr>
                   <th>Фото</th>
                   <th>Название</th>
-                  <th>Цены (будни / вых.)</th>
                   <th>Вместимость</th>
                   <th>Площадь</th>
                   <th>Порядок</th>
@@ -550,7 +544,6 @@ onMounted(() => {
                     <strong>{{ v.name }}</strong><br />
                     <small class="muted">/{{ v.slug }}</small>
                   </td>
-                  <td>{{ formatPrice(v.price_weekday) }} / {{ formatPrice(v.price_weekend) }}</td>
                   <td>до {{ v.capacity }} чел.</td>
                   <td>{{ v.area_m2 }} м²</td>
                   <td>{{ v.sort_order }}</td>
@@ -576,14 +569,6 @@ onMounted(() => {
             <div class="field">
               <label>Название *</label>
               <input v-model="venueForm.name" placeholder="Универсальный зал" />
-            </div>
-            <div class="field">
-              <label>Цена будни, ₸/час *</label>
-              <input v-model.number="venueForm.price_weekday" type="number" min="0" />
-            </div>
-            <div class="field">
-              <label>Цена выходные, ₸/час *</label>
-              <input v-model.number="venueForm.price_weekend" type="number" min="0" />
             </div>
             <div class="field">
               <label>Вместимость, чел.</label>

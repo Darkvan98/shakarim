@@ -1,6 +1,6 @@
 <script setup>
 import { ref } from 'vue'
-import { getGallery, getVenues, formatPrice } from '../api'
+import { getGallery, getVenues } from '../api'
 </script>
 
 <template>
@@ -44,9 +44,7 @@ import { getGallery, getVenues, formatPrice } from '../api'
                 <span>до {{ v.capacity }} чел.</span>
                 <span>{{ v.area_m2 }} м²</span>
               </div>
-              <div class="venue-price">
-                от <strong>{{ formatPrice(Math.min(v.price_weekday, v.price_weekend)) }}</strong> / час
-              </div>
+
             </div>
           </router-link>
         </div>
@@ -139,7 +137,7 @@ export default {
       this.lightbox = src
       this.lightboxCaption = title
     },
-    formatPrice,
+
   },
 }
 </script>
@@ -165,7 +163,7 @@ export default {
 .venue-card img { width: 100%; height: 200px; object-fit: cover; display: block; }
 .venue-body { padding: 18px 20px 20px; }
 .venue-meta { display: flex; gap: 14px; color: var(--muted); font-size: 13.5px; margin: 8px 0; }
-.venue-price strong { color: var(--navy); }
+
 
 .steps { counter-reset: step; }
 .step { text-align: left; padding: 22px; background: var(--bg); border-radius: var(--radius); }

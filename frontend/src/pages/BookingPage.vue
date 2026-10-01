@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { createBooking, formatDateHuman, formatPrice, getOccupied, getVenues } from '../api'
+import { createBooking, formatDateHuman, getOccupied, getVenues } from '../api'
 
 const OPEN_HOUR = 8
 const CLOSE_HOUR = 22
@@ -34,18 +34,6 @@ const maxDate = computed(() => {
 })
 
 const venue = computed(() => venues.value.find((v) => v.id === venueId.value))
-
-const isWeekend = computed(() => {
-  const d = new Date(dateStr.value + 'T00:00:00')
-  return d.getDay() === 0 || d.getDay() === 6
-})
-
-const pricePerHour = computed(() => {
-  if (!venue.value) return 0
-  return isWeekend.value ? venue.value.price_weekend : venue.value.price_weekday
-})
-
-const total = computed(() => pricePerHour.value * hours.value)
 
 const endTime = computed(() => {
   const [h, m] = start.value.split(':').map(Number)
@@ -328,17 +316,13 @@ onMounted(async () => {
           <li><span>Дата</span><strong>{{ formatDateHuman(dateStr) }}</strong></li>
           <li><span>Время</span><strong>{{ start }}–{{ endTime }}</strong></li>
           <li><span>Длительность</span><strong>{{ hours }} ч</strong></li>
-          <li>
-            <span>Стоимость часа</span>
-            <strong>{{ formatPrice(pricePerHour) }}{{ isWeekend ? ' (вых.)' : '' }}</strong>
-          </li>
-          <li class="sum-total"><span>Итого</span><strong>{{ formatPrice(total) }}</strong></li>
+          <li class="sum-total"><span>Итого</span><strong>по договору</strong></li>
         </ul>
         <button class="btn btn-gold btn-block" :disabled="submitting || !name || !phone" @click="submit">
           {{ submitting ? 'Отправляем…' : 'Забронировать' }}
         </button>
         <p class="muted small">
-          Оплата на месте. Бронь действует до подтверждения администратором.
+          Бронь действует до подтверждения администратором.
         </p>
       </aside>
     </div>

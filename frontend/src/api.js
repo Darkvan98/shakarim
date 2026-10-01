@@ -52,9 +52,6 @@ export function getBooking(code) {
   return api(`/api/bookings/${code}`)
 }
 
-export function formatPrice(value) {
-  return new Intl.NumberFormat('ru-RU').format(value) + ' ₸'
-}
 
 export function formatDateHuman(dateStr) {
   return new Date(dateStr + 'T00:00:00').toLocaleDateString('ru-RU', {
