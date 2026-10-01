@@ -204,6 +204,8 @@ function emptyVenueForm() {
     image: '',
     features: [],
     sort_order: 0,
+    price_weekday: 0,
+    price_weekend: 0,
   }
 }
 
@@ -531,6 +533,7 @@ onMounted(() => {
                   <th>Название</th>
                   <th>Вместимость</th>
                   <th>Площадь</th>
+                  <th>Цена (будни / вых.)</th>
                   <th>Порядок</th>
                   <th></th>
                 </tr>
@@ -544,6 +547,7 @@ onMounted(() => {
                   </td>
                   <td>до {{ v.capacity }} чел.</td>
                   <td>{{ v.area_m2 }} м²</td>
+                  <td>{{ v.price_weekday ? v.price_weekday + ' ₸' : 'бесплатно' }} / {{ v.price_weekend ? v.price_weekend + ' ₸' : 'бесплатно' }}</td>
                   <td>{{ v.sort_order }}</td>
                   <td class="actions">
                     <button class="btn btn-sm btn-primary" @click="startEditVenue(v)">✎</button>
@@ -563,7 +567,7 @@ onMounted(() => {
           <h3>{{ venueTitle }}</h3>
           <div v-if="venueError" class="alert alert-error">{{ venueError }}</div>
 
-          <div class="grid-3">
+          <div class="grid-2">
             <div class="field">
               <label>Название *</label>
               <input v-model="venueForm.name" placeholder="Универсальный зал" />
@@ -572,6 +576,8 @@ onMounted(() => {
               <label>Вместимость, чел.</label>
               <input v-model.number="venueForm.capacity" type="number" min="0" />
             </div>
+          </div>
+          <div class="grid-2">
             <div class="field">
               <label>Площадь, м²</label>
               <input v-model.number="venueForm.area_m2" type="number" min="0" />
@@ -579,6 +585,16 @@ onMounted(() => {
             <div class="field">
               <label>Порядок сортировки</label>
               <input v-model.number="venueForm.sort_order" type="number" min="0" />
+            </div>
+          </div>
+          <div class="grid-2">
+            <div class="field">
+              <label>Цена будни (₸)</label>
+              <input v-model.number="venueForm.price_weekday" type="number" min="0" placeholder="0 – бесплатно" />
+            </div>
+            <div class="field">
+              <label>Цена выходные (₸)</label>
+              <input v-model.number="venueForm.price_weekend" type="number" min="0" placeholder="0 – бесплатно" />
             </div>
           </div>
 
