@@ -204,8 +204,6 @@ function emptyVenueForm() {
     image: '',
     features: [],
     sort_order: 0,
-    price_weekday: 0,
-    price_weekend: 0,
   }
 }
 
@@ -533,7 +531,6 @@ onMounted(() => {
                   <th>Название</th>
                   <th>Вместимость</th>
                   <th>Площадь</th>
-                  <th>Цена (будни / вых.)</th>
                   <th>Порядок</th>
                   <th></th>
                 </tr>
@@ -547,7 +544,6 @@ onMounted(() => {
                   </td>
                   <td>до {{ v.capacity }} чел.</td>
                   <td>{{ v.area_m2 }} м²</td>
-                  <td>{{ v.price_weekday ? v.price_weekday + ' ₸' : '' }}{{ v.price_weekday && v.price_weekend ? ' / ' : '' }}{{ v.price_weekend ? v.price_weekend + ' ₸' : '' }}</td>
                   <td>{{ v.sort_order }}</td>
                   <td class="actions">
                     <button class="btn btn-sm btn-primary" @click="startEditVenue(v)">✎</button>
@@ -585,15 +581,6 @@ onMounted(() => {
             <div class="field">
               <label>Порядок сортировки</label>
               <input v-model.number="venueForm.sort_order" type="number" min="0" />
-            </div>
-          </div>          <div v-if="venueForm.price_weekday || venueForm.price_weekend" class="grid-2">
-            <div class="field">
-              <label>Цена будни (₸)</label>
-              <input v-model.number="venueForm.price_weekday" type="number" min="0" />
-            </div>
-            <div class="field">
-              <label>Цена выходные (₸)</label>
-              <input v-model.number="venueForm.price_weekend" type="number" min="0" />
             </div>
           </div>
 

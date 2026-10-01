@@ -35,21 +35,6 @@ const maxDate = computed(() => {
 
 const venue = computed(() => venues.value.find((v) => v.id === venueId.value))
 
-function isWeekend(dateStr) {
-  const d = new Date(dateStr + 'T12:00:00')
-  const day = d.getDay()
-  return day === 0 || day === 6
-}
-
-const venuePrice = computed(() => {
-  const v = venue.value
-  if (!v) return 0
-  if (isWeekend(dateStr.value)) return v.price_weekend || 0
-  return v.price_weekday || 0
-})
-
-const totalPrice = computed(() => venuePrice.value * hours.value)
-
 const endTime = computed(() => {
   const [h, m] = start.value.split(':').map(Number)
   const total = h * 60 + m + hours.value * 60
@@ -328,7 +313,7 @@ onMounted(async () => {
           <li><span>Дата</span><strong>{{ formatDateHuman(dateStr) }}</strong></li>
           <li><span>Время</span><strong>{{ start }}–{{ endTime }}</strong></li>
           <li><span>Длительность</span><strong>{{ hours }} ч</strong></li>
-          <li class="sum-total"><span>Итого</span><strong>{{ totalPrice ? totalPrice.toLocaleString() + ' ₸' : 'по договору' }}</strong></li>
+
         </ul>
         <button class="btn btn-gold btn-block" :disabled="submitting || !name || !phone" @click="submit">
           {{ submitting ? 'Отправляем…' : 'Забронировать' }}
