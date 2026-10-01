@@ -199,10 +199,7 @@ function onPhoneInput(e) {
     if (digits.length > 8) formatted += '-' + digits.slice(8, 10)
   }
 
-  // Если formatted совпадает с текущим значением — не обновляем (избегаем дублирования)
-  if (formatted !== phone.value) {
-    phone.value = formatted
-  }
+  phone.value = formatted
 }
 
 async function submit() {
