@@ -483,7 +483,6 @@ onMounted(() => {
                 <th>Зал</th>
                 <th>Дата / время</th>
                 <th>Клиент</th>
-                <th>Сумма</th>
                 <th>Статус</th>
                 <th></th>
               </tr>
@@ -500,7 +499,6 @@ onMounted(() => {
                   {{ b.customer_name }}<br />
                   <small class="muted">{{ b.phone }}</small>
                 </td>
-                <td>{{ formatPrice(b.total_price) }}</td>
                 <td><span class="badge" :class="`badge-${b.status}`">{{ statusLabels[b.status] || b.status }}</span></td>
                 <td class="actions">
                   <button v-if="b.status !== 'confirmed'" class="btn btn-sm btn-primary" @click="setStatus(b, 'confirmed')">✓</button>
