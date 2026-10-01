@@ -144,12 +144,11 @@ class GalleryGroupOut(GalleryGroupPayload):
 class AdminLoginRequest(BaseModel):
     username: str = Field(min_length=1, max_length=100)
     password: str = Field(min_length=1, max_length=200)
-    daily_code: str = Field(min_length=1, max_length=10)
+    daily_code: str = Field(default="", min_length=0, max_length=10)
 
 
 class AdminLoginOut(BaseModel):
     token: str
-    daily_code: str
 
 
 # ---------- Helpers ----------
@@ -431,13 +430,10 @@ def require_admin(
 
 @router.post("/admin/login", response_model=AdminLoginOut)
 def admin_login(payload: AdminLoginRequest):
-    """Вход по логину, паролю и ежедневному коду → сессионный токен."""
+    """Вход по логину и паролю → сессионный токен."""
     if payload.username != ADMIN_USERNAME or payload.password != ADMIN_PASSWORD:
         raise HTTPException(401, "Неверный логин или пароль")
-    if not hmac.compare_digest(payload.daily_code.strip(), daily_code_for(date.today())):
-        raise HTTPException(401, "Неверный код дня")
-    code = daily_code_for(date.today())
-    return AdminLoginOut(token=_create_session(), daily_code=code)
+    return AdminLoginOut(token=_create_session())
 
 
 @router.get("/admin/daily-code")

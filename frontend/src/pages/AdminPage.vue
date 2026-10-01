@@ -146,8 +146,7 @@ const token = ref(localStorage.getItem('adminToken') || '')
 const logged = ref(false)
 const username = ref('')
 const password = ref('')
-const dailyCode = ref('')
-const todayCode = ref('')
+
 const error = ref('')
 // Страница админки скрыта: без «ключа доступа» в URL выглядит как обычная 404
 const ADMIN_KEY = 'kabinet-2026'
@@ -219,17 +218,15 @@ async function login() {
   error.value = ''
   loading.value = true
   try {
-    const { token: sessionToken, daily_code } = await api('/api/admin/login', {
+    const { token: sessionToken } = await api('/api/admin/login', {
       method: 'POST',
       body: JSON.stringify({
         username: username.value,
         password: password.value,
-        daily_code: dailyCode.value.trim(),
       }),
     })
     token.value = sessionToken
     localStorage.setItem('adminToken', sessionToken)
-    todayCode.value = daily_code
     await load()
   } catch (e) {
     error.value = e.message
@@ -416,12 +413,9 @@ onMounted(() => {
         <label>Пароль</label>
         <input v-model="password" type="password" autocomplete="current-password" placeholder="••••••••" @keyup.enter="login" />
       </div>
-      <div class="field">
-        <label>Код дня (меняется каждый день)</label>
-        <input v-model="dailyCode" inputmode="numeric" maxlength="6" placeholder="000000" @keyup.enter="login" />
-      </div>
+
       <div v-if="error" class="alert alert-error">{{ error }}</div>
-      <button class="btn btn-primary" :disabled="!username || !password || !dailyCode || loading" @click="login">
+      <button class="btn btn-primary" :disabled="!username || !password || loading" @click="login">
         {{ loading ? 'Проверяем…' : 'Войти' }}
       </button>
     </div>
@@ -429,9 +423,7 @@ onMounted(() => {
     <!-- DASHBOARD -->
     <template v-else>
       <div class="toolbar admin-logout-row">
-        <span v-if="todayCode" class="daily-code-chip">
-          Код дня: <strong>{{ todayCode }}</strong>
-        </span>
+
         <button class="btn btn-outline btn-sm" @click="logout">Выйти</button>
       </div>
       <div v-if="error" class="alert alert-error">{{ error }}</div>
