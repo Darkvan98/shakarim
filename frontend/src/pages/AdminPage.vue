@@ -146,26 +146,7 @@ const token = ref(localStorage.getItem('adminToken') || '')
 const logged = ref(false)
 const username = ref('')
 const password = ref('')
-
 const error = ref('')
-// Страница админки скрыта: без «ключа доступа» в URL выглядит как обычная 404
-const ADMIN_KEY = 'kabinet-2026'
-const hidden = ref(false)
-
-function checkHidden() {
-  if (window.location.hash === `#${ADMIN_KEY}`) {
-    hidden.value = false
-    localStorage.setItem('adminHiddenOk', '1')
-    // убираем ключ из адресной строки, чтобы не светился в истории
-    history.replaceState(null, '', window.location.pathname)
-  } else if (localStorage.getItem('adminHiddenOk') === '1') {
-    hidden.value = false
-  } else {
-    hidden.value = true
-  }
-}
-checkHidden()
-
 const tab = ref('bookings') // bookings | venues
 
 // ----- bookings -----
@@ -385,20 +366,12 @@ async function removeVenue(v) {
 }
 
 onMounted(() => {
-  if (hidden.value) return
   if (token.value) load()
 })
 </script>
 
 <template>
-  <!-- Заглушка 404 для всех, кто зашёл без ключа -->
-  <div v-if="hidden" class="container section notfound">
-    <h1>404</h1>
-    <p class="muted">Страница не найдена. <router-link to="/">На главную</router-link></p>
-  </div>
-
-  <div v-else class="container section">
-    <span class="eyebrow">Для администраторов</span>
+  <div class="container section">
     <h1>Панель управления</h1>
 
     <!-- LOGIN -->
