@@ -12,6 +12,7 @@ class Venue(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     slug: Mapped[str] = mapped_column(String, unique=True, index=True)
     name: Mapped[str] = mapped_column(String)
+    sports_complex: Mapped[str] = mapped_column(String, default="")
     description: Mapped[str] = mapped_column(String, default="")
     capacity: Mapped[int] = mapped_column(Integer, default=0)
     area_m2: Mapped[int] = mapped_column(Integer, default=0)

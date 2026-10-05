@@ -56,6 +56,7 @@ class VenueOut(BaseModel):
     id: int
     slug: str
     name: str
+    sports_complex: str
     description: str
     capacity: int
     area_m2: int
@@ -113,6 +114,7 @@ class OccupiedSlot(BaseModel):
 
 class VenuePayload(BaseModel):
     name: str = Field(min_length=2, max_length=120)
+    sports_complex: str = Field(default="", max_length=200)
     description: str = Field(default="", max_length=2000)
     capacity: int = Field(default=0, ge=0, le=10000)
     area_m2: int = Field(default=0, ge=0, le=100000)
@@ -161,6 +163,7 @@ def to_venue_out(v: models.Venue) -> VenueOut:
         id=v.id,
         slug=v.slug,
         name=v.name,
+        sports_complex=v.sports_complex,
         description=v.description,
         capacity=v.capacity,
         area_m2=v.area_m2,
@@ -713,10 +716,12 @@ def _ensure_db():
             models.Venue(
                 slug="universal-hall",
                 name="Универсальный игровой зал",
-                description=(
-                    "Просторный зал с профессиональным покрытием для волейбола, "
-                    "баскетбола, мини-футбола и бадминтона. Трибуны, раздевалки, душевые."
-                ),
+                sports_complex="Шакарим",
+                description=
+                    (
+                        "Просторный зал с профессиональным покрытием для волейбола, "
+                        "баскетбола, мини-футбола и бадминтона. Трибуны, раздевалки, душевые."
+                    ),
                 capacity=60,
                 area_m2=900,
                 image="/images/hall-universal.jpeg",
@@ -731,10 +736,12 @@ def _ensure_db():
             models.Venue(
                 slug="small-hall",
                 name="Малый игровой зал",
-                description=(
-                    "Уютный зал для тренировок небольших групп: волейбол, бадминтон, "
-                    "общая физическая подготовка, секции и детские группы."
-                ),
+                sports_complex="Шакарим",
+                description=
+                    (
+                        "Уютный зал для тренировок небольших групп: волейбол, бадминтон, "
+                        "общая физическая подготовка, секции и детские группы."
+                    ),
                 capacity=30,
                 area_m2=450,
                 image="/images/hall-small.jpeg",
@@ -749,10 +756,12 @@ def _ensure_db():
             models.Venue(
                 slug="gym",
                 name="Тренажёрный зал",
-                description=(
-                    "Кардио-зона (беговые дорожки, велотренажёры), свободные веса, "
-                    "силовые станции. Для групповых и персональных тренировок."
-                ),
+                sports_complex="Шакарим",
+                description=
+                    (
+                        "Кардио-зона (беговые дорожки, велотренажёры), свободные веса, "
+                        "силовые станции. Для групповых и персональных тренировок."
+                    ),
                 capacity=25,
                 area_m2=400,
                 image="/images/hall-gym.jpeg",

@@ -178,6 +178,7 @@ const featureInput = ref('')
 function emptyVenueForm() {
   return {
     name: '',
+    sports_complex: '',
     description: '',
     capacity: 0,
     area_m2: 0,
@@ -494,6 +495,7 @@ onMounted(() => {
                 <tr>
                   <th>Фото</th>
                   <th>Название</th>
+                  <th>Спорткомплекс</th>
                   <th>Вместимость</th>
                   <th>Площадь</th>
                   <th>Порядок</th>
@@ -507,6 +509,7 @@ onMounted(() => {
                     <strong>{{ v.name }}</strong><br />
                     <small class="muted">/{{ v.slug }}</small>
                   </td>
+                  <td>{{ v.sports_complex || '—' }}</td>
                   <td>до {{ v.capacity }} чел.</td>
                   <td>{{ v.area_m2 }} м²</td>
                   <td>{{ v.sort_order }}</td>
@@ -534,15 +537,21 @@ onMounted(() => {
               <input v-model="venueForm.name" placeholder="Универсальный зал" />
             </div>
             <div class="field">
-              <label>Вместимость, чел.</label>
-              <input v-model.number="venueForm.capacity" type="number" min="0" />
+              <label>Какой это спорткомплекс</label>
+              <input v-model="venueForm.sports_complex" placeholder="например: Шакарим" />
             </div>
           </div>
           <div class="grid-2">
             <div class="field">
+              <label>Вместимость, чел.</label>
+              <input v-model.number="venueForm.capacity" type="number" min="0" />
+            </div>
+            <div class="field">
               <label>Площадь, м²</label>
               <input v-model.number="venueForm.area_m2" type="number" min="0" />
             </div>
+          </div>
+          <div class="grid-2">
             <div class="field">
               <label>Порядок сортировки</label>
               <input v-model.number="venueForm.sort_order" type="number" min="0" />
