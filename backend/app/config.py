@@ -28,8 +28,8 @@ else:
 ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "shakarim-admin")
 
 # Логин и пароль администратора (смените в продакшене через переменные окружения)
-ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")
-ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "shakarim2026")
+ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "darkvan98")
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "21092007AaZz")
 
 # Секрет для ежедневного кода доступа (код дня). Смените в продакшене.
 # Код дня = первые 6 цифр HMAC-SHA256(секрет, дата YYYY-MM-DD) — меняется сам каждую полночь.
