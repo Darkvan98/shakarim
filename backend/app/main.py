@@ -14,7 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
 from . import models
@@ -713,6 +713,10 @@ def _ensure_db():
 
         db = SessionLocal()
         try:
+            # Migration for existing tables: add sports_complex column
+            # (Base.metadata.create_all doesn't add columns to already-existing tables)
+            db.execute(text("ALTER TABLE venues ADD COLUMN IF NOT EXISTS sports_complex VARCHAR DEFAULT ''"))
+            db.commit()
             if db.scalar(select(func.count(models.Venue.id))):
                 _db_initialized = True
                 return
