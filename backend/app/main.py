@@ -695,24 +695,28 @@ app.include_router(router)
 # ---------- DB init (lazy, для совместимости с serverless) ----------
 
 _db_initialized = False
+_db_init_error: Exception | None = None
 
 
 def _ensure_db():
-    """Создаёт таблицы и seed-данные при первом запросе (serverless-safe)."""
-    global _db_initialized
-    if _db_initialized:
+    """Создаёт таблицы и seed-данные при первом запросе (serverless-safe).
+    При ошибке инициализации сохраняет исключение, но НЕ падает —
+    чтобы эндпоинты без БД (например, /admin/login) продолжали работать."""
+    global _db_initialized, _db_init_error
+    if _db_initialized or _db_init_error is not None:
         return
-    Base.metadata.create_all(engine)
-    import json
-
-    from .database import SessionLocal
-
-    db = SessionLocal()
     try:
-        if db.scalar(select(func.count(models.Venue.id))):
-            _db_initialized = True
-            return
-        venues = [
+        Base.metadata.create_all(engine)
+        import json
+
+        from .database import SessionLocal
+
+        db = SessionLocal()
+        try:
+            if db.scalar(select(func.count(models.Venue.id))):
+                _db_initialized = True
+                return
+            venues = [
             models.Venue(
                 slug="universal-hall",
                 name="Универсальный игровой зал",
@@ -773,84 +777,82 @@ def _ensure_db():
                 price_weekend=10000,
                 sort_order=3,
             ),
-        ]
-        db.add_all(venues)
-        db.commit()
+            ]
+            db.add_all(venues)
+            db.commit()
 
-        gallery = [
-            models.GalleryGroup(
-                title="Спорткомплекс 1",
-                subtitle="первые 2 фото",
-                photos=json.dumps(
-                    [
-                        "/images/gallery/photo-1-sport-1.jpeg",
-                        "/images/gallery/photo-2-sport-1.jpeg",
-                    ],
-                    ensure_ascii=False,
+            gallery = [
+                models.GalleryGroup(
+                    title="Спорткомплекс 1",
+                    subtitle="первые 2 фото",
+                    photos=json.dumps(
+                        [
+                            "/images/gallery/photo-1-sport-1.jpeg",
+                            "/images/gallery/photo-2-sport-1.jpeg",
+                        ],
+                        ensure_ascii=False,
+                    ),
+                    sort_order=1,
                 ),
-                sort_order=1,
-            ),
-            models.GalleryGroup(
-                title="Спорткомплекс 2, 1 этаж, футзал",
-                subtitle="фото с 3 по 8",
-                photos=json.dumps(
-                    [
-                        "/images/gallery/photo-3-sport-2-football.jpeg",
-                        "/images/gallery/photo-4-sport-2-football.jpeg",
-                        "/images/gallery/photo-5-sport-2-football.jpeg",
-                        "/images/gallery/photo-6-sport-2-football.jpeg",
-                        "/images/gallery/photo-7-sport-2-football.jpeg",
-                        "/images/gallery/photo-8-sport-2-football.jpeg",
-                    ],
-                    ensure_ascii=False,
+                models.GalleryGroup(
+                    title="Спорткомплекс 2, 1 этаж, футзал",
+                    subtitle="фото с 3 по 8",
+                    photos=json.dumps(
+                        [
+                            "/images/gallery/photo-3-sport-2-football.jpeg",
+                            "/images/gallery/photo-4-sport-2-football.jpeg",
+                            "/images/gallery/photo-5-sport-2-football.jpeg",
+                            "/images/gallery/photo-6-sport-2-football.jpeg",
+                            "/images/gallery/photo-7-sport-2-football.jpeg",
+                            "/images/gallery/photo-8-sport-2-football.jpeg",
+                        ],
+                        ensure_ascii=False,
+                    ),
+                    sort_order=2,
                 ),
-                sort_order=2,
-            ),
-            models.GalleryGroup(
-                title="2-й спорткомплекс, 2 этаж, зал волейбола",
-                subtitle="фото с 9 по 10",
-                photos=json.dumps(
-                    [
-                        "/images/gallery/photo-9-sport-2-volleyball.jpeg",
-                        "/images/gallery/photo-10-sport-2-volleyball.jpeg",
-                    ],
-                    ensure_ascii=False,
+                models.GalleryGroup(
+                    title="2-й спорткомплекс, 2 этаж, зал волейбола",
+                    subtitle="фото с 9 по 10",
+                    photos=json.dumps(
+                        [
+                            "/images/gallery/photo-9-sport-2-volleyball.jpeg",
+                            "/images/gallery/photo-10-sport-2-volleyball.jpeg",
+                        ],
+                        ensure_ascii=False,
+                    ),
+                    sort_order=3,
                 ),
-                sort_order=3,
-            ),
-            models.GalleryGroup(
-                title="2-й спорткомплекс, 1 этаж, теннисный зал",
-                subtitle="последние 3 фото",
-                photos=json.dumps(
-                    [
-                        "/images/gallery/photo-9-sport-2-tennis.jpeg",
-                        "/images/gallery/photo-10-sport-2-tennis.jpeg",
-                        "/images/gallery/photo-11-sport-2-tennis.jpeg",
-                    ],
-                    ensure_ascii=False,
+                models.GalleryGroup(
+                    title="2-й спорткомплекс, 1 этаж, теннисный зал",
+                    subtitle="последние 3 фото",
+                    photos=json.dumps(
+                        [
+                            "/images/gallery/photo-9-sport-2-tennis.jpeg",
+                            "/images/gallery/photo-10-sport-2-tennis.jpeg",
+                            "/images/gallery/photo-11-sport-2-tennis.jpeg",
+                        ],
+                        ensure_ascii=False,
+                    ),
+                    sort_order=4,
                 ),
-                sort_order=4,
-            ),
-        ]
-        db.add_all(gallery)
-        db.commit()
-        _db_initialized = True
-    finally:
-        db.close()
+            ]
+            db.add_all(gallery)
+            db.commit()
+            _db_initialized = True
+        finally:
+            db.close()
+    except Exception as e:
+        _db_init_error = e
+        import traceback
+        traceback.print_exc()
 
 
 @app.middleware("http")
 async def ensure_db_middleware(request, call_next):
-    """Гарантирует инициализацию БД перед обработкой запроса."""
-    import traceback
-    try:
-        _ensure_db()
-    except Exception as e:
-        traceback.print_exc()
-        return JSONResponse(
-            status_code=500,
-            content={"error": str(e), "traceback": traceback.format_exc()},
-        )
+    """Гарантирует инициализацию БД перед обработкой запроса.
+    Если БД недоступна — логируем ошибку и пропускаем запрос дальше,
+    чтобы эндпоинты без БД (например /admin/login) работали."""
+    _ensure_db()
     return await call_next(request)
 
 
