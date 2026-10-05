@@ -5,6 +5,7 @@ import os
 import re
 import secrets
 import shutil
+import time
 import unicodedata
 import uuid
 from datetime import date, datetime, timedelta
@@ -113,15 +114,15 @@ class OccupiedSlot(BaseModel):
 
 
 class VenuePayload(BaseModel):
-    name: str = Field(min_length=2, max_length=120)
+    name: str = Field(default="", max_length=120)
     sports_complex: str = Field(default="", max_length=200)
     description: str = Field(default="", max_length=2000)
     capacity: int = Field(default=0, ge=0, le=10000)
     area_m2: int = Field(default=0, ge=0, le=100000)
     image: str = Field(default="", max_length=300)
     features: list[str] = []
-    price_weekday: int = Field(ge=0, le=10_000_000)
-    price_weekend: int = Field(ge=0, le=10_000_000)
+    price_weekday: int = Field(default=0, ge=0, le=10_000_000)
+    price_weekend: int = Field(default=0, ge=0, le=10_000_000)
     sort_order: int = Field(default=0, ge=0, le=1000)
 
 
@@ -696,15 +697,23 @@ app.include_router(router)
 
 _db_initialized = False
 _db_init_error: Exception | None = None
+_db_last_error_time: float = 0
+_db_error_retry_after = 30  # seconds before retrying a failed init
 
 
 def _ensure_db():
     """Создаёт таблицы и seed-данные при первом запросе (serverless-safe).
     При ошибке инициализации сохраняет исключение, но НЕ падает —
     чтобы эндпоинты без БД (например, /admin/login) продолжали работать."""
-    global _db_initialized, _db_init_error
-    if _db_initialized or _db_init_error is not None:
+    global _db_initialized, _db_init_error, _db_last_error_time
+    if _db_initialized:
         return
+    # Retry after cooldown, don't permanently cache DB init errors
+    # (serverless warm instances may have a stale error from a transient failure)
+    if _db_init_error is not None:
+        if time.time() - _db_last_error_time < _db_error_retry_after:
+            return
+        _db_init_error = None  # reset and retry
     try:
         Base.metadata.create_all(engine)
         import json
@@ -847,6 +856,7 @@ def _ensure_db():
             db.close()
     except Exception as e:
         _db_init_error = e
+        _db_last_error_time = time.time()
         import traceback
         traceback.print_exc()
 

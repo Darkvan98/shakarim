@@ -533,7 +533,7 @@ onMounted(() => {
 
           <div class="grid-2">
             <div class="field">
-              <label>Название *</label>
+              <label>Название (необязательно)</label>
               <input v-model="venueForm.name" placeholder="Универсальный зал" />
             </div>
             <div class="field">
@@ -592,7 +592,7 @@ onMounted(() => {
           </div>
 
           <div class="form-actions">
-            <button class="btn btn-primary" :disabled="venueSaving || !venueForm.name" @click="saveVenue">
+            <button class="btn btn-primary" :disabled="venueSaving" @click="saveVenue">
               {{ venueSaving ? 'Сохраняем…' : 'Сохранить' }}
             </button>
             <button class="btn btn-outline" @click="cancelVenueForm">Отмена</button>
