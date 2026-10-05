@@ -24,6 +24,7 @@ from .config import (
     ADMIN_TOKEN,
     ADMIN_USERNAME,
     CLOSE_HOUR,
+    DB_URL,
     MAX_DAYS_AHEAD,
     OPEN_HOUR,
     WEEKEND_MULTIPLIER,
@@ -832,6 +833,34 @@ def _ensure_db():
 @app.middleware("http")
 async def ensure_db_middleware(request, call_next):
     """Гарантирует инициализацию БД перед обработкой запроса."""
-    _ensure_db()
+    import traceback
+    try:
+        _ensure_db()
+    except Exception as e:
+        traceback.print_exc()
+        return JSONResponse(
+            status_code=500,
+            content={"error": str(e), "traceback": traceback.format_exc()},
+        )
     return await call_next(request)
+
+
+@router.get("/debug/health")
+def debug_health():
+    """Diagnostic endpoint — shows env and DB connectivity."""
+    import traceback
+    info = {
+        "db_url_prefix": DB_URL[:30] + "..." if len(DB_URL) > 30 else DB_URL,
+        "db_ok": False,
+        "error": None,
+    }
+    try:
+        from .database import SessionLocal
+        db = SessionLocal()
+        db.execute(select(func.count(models.Venue.id)))
+        info["db_ok"] = True
+        db.close()
+    except Exception as e:
+        info["error"] = traceback.format_exc()
+    return info
 
