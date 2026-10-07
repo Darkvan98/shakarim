@@ -61,7 +61,7 @@ async function uploadGalleryPhoto(file) {
     fd.append('file', file)
     const res = await fetch('/api/admin/uploads', {
       method: 'POST',
-      headers: { 'X-Admin-Token': token.value },
+      headers: authHeaders(),
       body: fd,
     })
     if (!res.ok) {
@@ -86,7 +86,7 @@ async function replaceGalleryPhoto(idx, file) {
     fd.append('file', file)
     const res = await fetch('/api/admin/uploads', {
       method: 'POST',
-      headers: { 'X-Admin-Token': token.value },
+      headers: authHeaders(),
       body: fd,
     })
     if (!res.ok) {
@@ -313,7 +313,7 @@ async function uploadImage(file) {
     fd.append('file', file)
     const res = await fetch('/api/admin/uploads', {
       method: 'POST',
-      headers: { 'X-Admin-Token': token.value },
+      headers: authHeaders(),
       body: fd,
     })
     if (!res.ok) {

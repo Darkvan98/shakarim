@@ -4,15 +4,13 @@ import json
 import os
 import re
 import secrets
-import shutil
 import time
 import unicodedata
-import uuid
 from datetime import date, datetime, timedelta
 
 from fastapi import APIRouter, Depends, FastAPI, File, Header, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import func, select, text
@@ -608,21 +606,7 @@ def make_slug(name: str, db: Session, exclude_id: int | None = None) -> str:
     return s
 
 
-UPLOAD_DIR = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)), "..", "frontend", "public", "images", "uploads"
-)
 ALLOWED_IMAGE_EXT = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
-
-
-def _save_upload(file: UploadFile) -> str:
-    ext = os.path.splitext(file.filename or "")[1].lower()
-    if ext not in ALLOWED_IMAGE_EXT:
-        raise HTTPException(422, "Только изображения: " + ", ".join(sorted(ALLOWED_IMAGE_EXT)))
-    os.makedirs(UPLOAD_DIR, exist_ok=True)
-    fname = f"{uuid.uuid4().hex}{ext}"
-    with open(os.path.join(UPLOAD_DIR, fname), "wb") as f:
-        shutil.copyfileobj(file.file, f)
-    return f"/images/uploads/{fname}"
 
 
 @router.get("/admin/venues", response_model=list[VenueOut])
@@ -766,11 +750,40 @@ def admin_delete_block(block_id: int, db: Session = Depends(get_db), _: None = D
 
 
 @router.post("/admin/uploads", response_model=UploadOut, status_code=201)
-def admin_upload_image(
+async def admin_upload_image(
     file: UploadFile = File(...),
+    db: Session = Depends(get_db),
     _: None = Depends(require_admin),
 ):
-    return UploadOut(path=_save_upload(file))
+    """Загрузка изображения: сохраняем в БД (на Vercel ФС только для чтения)."""
+    ext = os.path.splitext(file.filename or "")[1].lower()
+    if ext not in ALLOWED_IMAGE_EXT:
+        raise HTTPException(422, "Только изображения: " + ", ".join(sorted(ALLOWED_IMAGE_EXT)))
+    data = await file.read()
+    if len(data) > 8 * 1024 * 1024:
+        raise HTTPException(422, "Файл слишком большой — максимум 8 МБ")
+    img = models.UploadedImage(
+        filename=file.filename or f"image{ext}",
+        content_type=file.content_type or "application/octet-stream",
+        data=data,
+    )
+    db.add(img)
+    db.commit()
+    db.refresh(img)
+    return UploadOut(path=f"/api/images/{img.id}")
+
+
+@router.get("/images/{image_id}")
+def get_uploaded_image(image_id: int, db: Session = Depends(get_db)):
+    """Отдача загруженного изображения по id."""
+    img = db.get(models.UploadedImage, image_id)
+    if not img:
+        raise HTTPException(404, "Изображение не найдено")
+    return Response(
+        content=img.data,
+        media_type=img.content_type or "application/octet-stream",
+        headers={"Cache-Control": "public, max-age=31536000, immutable"},
+    )
 
 
 @router.get("/admin/bookings", response_model=list[BookingOut])

@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String
+from sqlalchemy import DateTime, ForeignKey, Integer, LargeBinary, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .database import Base
@@ -58,6 +58,19 @@ class VenueBlock(Base):
     start_time: Mapped[str] = mapped_column(String)          # HH:MM
     end_time: Mapped[str] = mapped_column(String)            # HH:MM
     label: Mapped[str] = mapped_column(String, default="")   # кем занято
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class UploadedImage(Base):
+    """Изображения, загруженные через админку.
+    Храним в БД: на Vercel файловая система только для чтения."""
+
+    __tablename__ = "uploaded_images"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    filename: Mapped[str] = mapped_column(String, default="")
+    content_type: Mapped[str] = mapped_column(String, default="")
+    data: Mapped[bytes] = mapped_column(LargeBinary)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
