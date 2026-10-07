@@ -46,6 +46,21 @@ class Booking(Base):
     venue: Mapped["Venue"] = relationship(back_populates="bookings")
 
 
+class VenueBlock(Base):
+    """Ручная блокировка времени зала администратором (вне системы бронирования):
+    когда занято, на сколько и кем."""
+
+    __tablename__ = "venue_blocks"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    venue_id: Mapped[int] = mapped_column(ForeignKey("venues.id"), index=True)
+    date: Mapped[str] = mapped_column(String, index=True)   # YYYY-MM-DD
+    start_time: Mapped[str] = mapped_column(String)          # HH:MM
+    end_time: Mapped[str] = mapped_column(String)            # HH:MM
+    label: Mapped[str] = mapped_column(String, default="")   # кем занято
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
 class GalleryGroup(Base):
     """Группа фото в галерее на главной (например, «Спорткомплекс 1»)."""
 

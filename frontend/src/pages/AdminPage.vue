@@ -366,6 +366,78 @@ async function removeVenue(v) {
   }
 }
 
+// ----- blocks (ручная занятость) -----
+const blockVenueId = ref(null)
+const blockDate = ref(new Date().toISOString().slice(0, 10))
+const blocks = ref([])
+const blockForm = ref(emptyBlockForm())
+const blockSaving = ref(false)
+const blockError = ref('')
+const blocksLoading = ref(false)
+
+function emptyBlockForm() {
+  return { start_time: '08:00', end_time: '09:00', label: '' }
+}
+
+function openBlocksTab() {
+  tab.value = 'blocks'
+  if (!blockVenueId.value && venues.value.length) {
+    blockVenueId.value = venues.value[0].id
+  }
+  if (blockVenueId.value) loadBlocks()
+}
+
+function openBlocksForVenue(venueId) {
+  venueEditing.value = null
+  tab.value = 'blocks'
+  blockVenueId.value = venueId
+  loadBlocks()
+}
+
+async function loadBlocks() {
+  if (!blockVenueId.value) return
+  blocksLoading.value = true
+  blockError.value = ''
+  try {
+    blocks.value = await api(`/api/admin/venues/${blockVenueId.value}/blocks?date=${blockDate.value}`, {
+      headers: authHeaders(),
+    })
+  } catch (e) {
+    blockError.value = e.message
+  } finally {
+    blocksLoading.value = false
+  }
+}
+
+async function addBlock() {
+  blockSaving.value = true
+  blockError.value = ''
+  try {
+    await api(`/api/admin/venues/${blockVenueId.value}/blocks`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ date: blockDate.value, ...blockForm.value }),
+    })
+    blockForm.value = emptyBlockForm()
+    await loadBlocks()
+  } catch (e) {
+    blockError.value = e.message
+  } finally {
+    blockSaving.value = false
+  }
+}
+
+async function removeBlock(blk) {
+  if (!confirm(`Убрать блокировку ${blk.start_time}–${blk.end_time}?`)) return
+  blockError.value = ''
+  try {
+    await api(`/api/admin/blocks/${blk.id}`, { method: 'DELETE', headers: authHeaders() })
+    blocks.value = blocks.value.filter((x) => x.id !== blk.id)
+  } catch (e) {
+    blockError.value = e.message
+  }
+}
+
 onMounted(() => {
   if (token.value) load()
 })
@@ -408,6 +480,9 @@ onMounted(() => {
         </button>
         <button class="tab" :class="{ active: tab === 'venues' }" @click="tab = 'venues'">
           Залы <span class="tab-count">{{ venues.length }}</span>
+        </button>
+        <button class="tab" :class="{ active: tab === 'blocks' }" @click="openBlocksTab">
+          Занятость
         </button>
         <button class="tab" :class="{ active: tab === 'gallery' }" @click="tab = 'gallery'">
           Галерея <span class="tab-count">{{ gallery.length }}</span>
@@ -595,9 +670,83 @@ onMounted(() => {
             <button class="btn btn-primary" :disabled="venueSaving" @click="saveVenue">
               {{ venueSaving ? 'Сохраняем…' : 'Сохранить' }}
             </button>
+            <button v-if="venueEditing !== 'new'" class="btn btn-outline" @click="openBlocksForVenue(venueEditing)">
+              📅 Занятость зала
+            </button>
             <button class="btn btn-outline" @click="cancelVenueForm">Отмена</button>
           </div>
         </div>
+      </div>
+
+      <!-- ===== OCCUPANCY (BLOCKS) TAB ===== -->
+      <div v-else-if="tab === 'blocks'">
+        <div class="grid-3">
+          <div class="field">
+            <label>Зал</label>
+            <select v-model.number="blockVenueId" @change="loadBlocks">
+              <option v-for="v in venues" :key="v.id" :value="v.id">{{ v.name || v.slug }}</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Дата</label>
+            <input v-model="blockDate" type="date" @change="loadBlocks" />
+          </div>
+        </div>
+
+        <div v-if="blockError" class="alert alert-error">{{ blockError }}</div>
+
+        <div v-if="blockVenueId" class="card venue-form">
+          <h3>Заблокировать время</h3>
+          <p class="muted small-note">
+            Заблокированное время будет недоступно для бронирования и покажется как занято в расписании.
+          </p>
+          <div class="grid-3">
+            <div class="field">
+              <label>С</label>
+              <input v-model="blockForm.start_time" type="time" />
+            </div>
+            <div class="field">
+              <label>До</label>
+              <input v-model="blockForm.end_time" type="time" />
+            </div>
+            <div class="field">
+              <label>Кем занято</label>
+              <input v-model="blockForm.label" placeholder="Например: Соревнования, секция…" @keyup.enter="addBlock" />
+            </div>
+          </div>
+          <div class="form-actions">
+            <button class="btn btn-primary" :disabled="blockSaving" @click="addBlock">
+              {{ blockSaving ? 'Сохраняем…' : '🔒 Заблокировать' }}
+            </button>
+          </div>
+        </div>
+
+        <div v-if="blockVenueId" class="table-wrap card">
+          <table>
+            <thead>
+              <tr>
+                <th>Дата</th>
+                <th>Время</th>
+                <th>Кем занято</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="blk in blocks" :key="blk.id">
+                <td>{{ formatDateHuman(blk.date) }}</td>
+                <td>{{ blk.start_time }}–{{ blk.end_time }}</td>
+                <td>{{ blk.label || '—' }}</td>
+                <td class="actions">
+                  <button class="btn btn-sm btn-danger" @click="removeBlock(blk)">🗑</button>
+                </td>
+              </tr>
+              <tr v-if="!blocksLoading && blocks.length === 0">
+                <td colspan="4" class="muted">Блокировок на эту дату нет</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div v-else-if="venues.length === 0" class="muted">Сначала создайте зал</div>
       </div>
 
       <!-- ===== GALLERY TAB ===== -->

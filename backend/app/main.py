@@ -113,6 +113,22 @@ class OccupiedSlot(BaseModel):
     status: str
 
 
+class VenueBlockIn(BaseModel):
+    date: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$")
+    start_time: str = Field(pattern=r"^\d{2}:\d{2}$")
+    end_time: str = Field(pattern=r"^\d{2}:\d{2}$")
+    label: str = Field(default="", max_length=200)
+
+
+class VenueBlockOut(BaseModel):
+    id: int
+    venue_id: int
+    date: str
+    start_time: str
+    end_time: str
+    label: str
+
+
 class VenuePayload(BaseModel):
     name: str = Field(default="", max_length=120)
     sports_complex: str = Field(default="", max_length=200)
@@ -247,6 +263,20 @@ def check_overlap(db: Session, venue_id: int, date_str: str, start_min: int, end
     return None
 
 
+def find_block_overlap(db: Session, venue_id: int, date_str: str, start_min: int, end_min: int) -> models.VenueBlock | None:
+    """Возвращает ручную блокировку администратора, пересекающуюся с интервалом."""
+    stmt = select(models.VenueBlock).where(
+        models.VenueBlock.venue_id == venue_id,
+        models.VenueBlock.date == date_str,
+    )
+    for blk in db.scalars(stmt):
+        bs = parse_hm(blk.start_time)
+        be = parse_hm(blk.end_time)
+        if start_min < be and end_min > bs:
+            return blk
+    return None
+
+
 # ---------- Public endpoints ----------
 
 @router.get("/venues", response_model=list[VenueOut])
@@ -269,16 +299,27 @@ def occupied_slots(
     date: str = Query(..., pattern=r"^\d{4}-\d{2}-\d{2}$"),
     db: Session = Depends(get_db),
 ):
-    """Занятые слоты зала на дату (pending + confirmed)."""
+    """Занятые слоты зала на дату (pending + confirmed + ручные блокировки)."""
     stmt = select(models.Booking).where(
         models.Booking.venue_id == venue_id,
         models.Booking.date == date,
         models.Booking.status.in_(["pending", "confirmed"]),
     )
-    return [
+    slots = [
         OccupiedSlot(start_time=b.start_time, end_time=b.end_time, status=b.status)
         for b in db.scalars(stmt)
     ]
+    blocks = db.scalars(
+        select(models.VenueBlock).where(
+            models.VenueBlock.venue_id == venue_id,
+            models.VenueBlock.date == date,
+        )
+    )
+    slots += [
+        OccupiedSlot(start_time=blk.start_time, end_time=blk.end_time, status="blocked")
+        for blk in blocks
+    ]
+    return slots
 
 
 class ScheduleBlock(BaseModel):
@@ -295,7 +336,8 @@ def venue_schedule(
     db: Session = Depends(get_db),
 ):
     """Почасовая разбивка 08:00–22:00. Каждый час — отдельный блок.
-    Занято, если есть бронь (pending/confirmed), перекрывающая этот час хотя бы на минуту."""
+    Занято, если есть бронь (pending/confirmed) или ручная блокировка,
+    перекрывающая этот час хотя бы на минуту."""
     d = validate_date(date)
 
     venue = db.get(models.Venue, venue_id)
@@ -312,8 +354,15 @@ def venue_schedule(
     )
     bookings = list(db.scalars(stmt))
 
+    blocks_stmt = select(models.VenueBlock).where(
+        models.VenueBlock.venue_id == venue_id,
+        models.VenueBlock.date == date,
+    )
+    blocks = list(db.scalars(blocks_stmt))
+
     # проставь флаг занятости по каждому часовому слоту
     occupied_hours: dict[int, bool] = {}
+    hour_labels: dict[int, str] = {}
     for h in range(OPEN_HOUR, CLOSE_HOUR):
         slot_start = h * 60
         slot_end = slot_start + 60
@@ -322,18 +371,26 @@ def venue_schedule(
             be = parse_hm(b.end_time)
             if bs < slot_end and be > slot_start:
                 occupied_hours[h] = True
+                hour_labels[h] = "занято"
+                break
+        for blk in blocks:
+            bs = parse_hm(blk.start_time)
+            be = parse_hm(blk.end_time)
+            if bs < slot_end and be > slot_start:
+                occupied_hours[h] = True
+                hour_labels[h] = f"занято: {blk.label}" if blk.label else "занято"
                 break
 
-    blocks = [
+    blocks_out = [
         ScheduleBlock(
             start_time=minutes_to_hm(h * 60),
             end_time=minutes_to_hm(h * 60 + 60),
             kind="occupied" if occupied_hours.get(h) else "free",
-            label="занято" if occupied_hours.get(h) else "свободно",
+            label=hour_labels.get(h) or "свободно",
         )
         for h in range(OPEN_HOUR, CLOSE_HOUR)
     ]
-    return blocks
+    return blocks_out
 
 
 @router.post("/bookings", response_model=BookingOut, status_code=201)
@@ -351,6 +408,11 @@ def create_booking(payload: BookingCreate, db: Session = Depends(get_db)):
 
     if check_overlap(db, venue.id, payload.date, start_min, end_min):
         raise HTTPException(409, "Этот слот уже занят. Выберите другое время.")
+
+    block = find_block_overlap(db, venue.id, payload.date, start_min, end_min)
+    if block:
+        who = f" — {block.label}" if block.label else ""
+        raise HTTPException(409, f"Это время заблокировано администратором{who}. Выберите другое время.")
 
     price_per_hour = venue_price_per_hour(venue, d)
     total = price_per_hour * payload.hours
@@ -611,7 +673,95 @@ def admin_delete_venue(venue_id: int, db: Session = Depends(get_db), _: None = D
     )
     if has_bookings:
         raise HTTPException(409, "У зала есть брони — сначала удалите их")
+    # удаляем ручные блокировки этого зала
+    for blk in db.scalars(select(models.VenueBlock).where(models.VenueBlock.venue_id == venue_id)):
+        db.delete(blk)
     db.delete(venue)
+    db.commit()
+
+
+# ---------- Admin: ручная занятость (блокировки времени) ----------
+
+def to_block_out(blk: models.VenueBlock) -> VenueBlockOut:
+    return VenueBlockOut(
+        id=blk.id,
+        venue_id=blk.venue_id,
+        date=blk.date,
+        start_time=blk.start_time,
+        end_time=blk.end_time,
+        label=blk.label,
+    )
+
+
+@router.get("/admin/venues/{venue_id}/blocks", response_model=list[VenueBlockOut])
+def admin_list_blocks(
+    venue_id: int,
+    date: str | None = Query(None, pattern=r"^\d{4}-\d{2}-\d{2}$"),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin),
+):
+    """Блокировки зала, опционально на конкретную дату."""
+    if not db.get(models.Venue, venue_id):
+        raise HTTPException(404, "Зал не найден")
+    stmt = select(models.VenueBlock).where(models.VenueBlock.venue_id == venue_id)
+    if date:
+        stmt = stmt.where(models.VenueBlock.date == date)
+    stmt = stmt.order_by(models.VenueBlock.date, models.VenueBlock.start_time)
+    return [to_block_out(blk) for blk in db.scalars(stmt)]
+
+
+@router.post("/admin/venues/{venue_id}/blocks", response_model=VenueBlockOut, status_code=201)
+def admin_create_block(
+    venue_id: int,
+    payload: VenueBlockIn,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin),
+):
+    """Ручная блокировка времени: даты, время и кем занято."""
+    venue = db.get(models.Venue, venue_id)
+    if not venue:
+        raise HTTPException(404, "Зал не найден")
+
+    start_min = parse_hm(payload.start_time)
+    end_min = parse_hm(payload.end_time)
+    if end_min <= start_min:
+        raise HTTPException(422, "Время окончания должно быть позже времени начала")
+    if end_min > 24 * 60:
+        raise HTTPException(422, "Время окончания не может быть позже 24:00")
+
+    overlap = find_block_overlap(db, venue_id, payload.date, start_min, end_min)
+    if overlap:
+        raise HTTPException(
+            409,
+            f"Это время уже заблокировано ({overlap.start_time}–{overlap.end_time}).",
+        )
+
+    booking = check_overlap(db, venue_id, payload.date, start_min, end_min)
+    if booking:
+        raise HTTPException(
+            409,
+            f"На это время уже есть бронь {booking.code} — сначала отмените или удалите её.",
+        )
+
+    blk = models.VenueBlock(
+        venue_id=venue_id,
+        date=payload.date,
+        start_time=payload.start_time,
+        end_time=payload.end_time,
+        label=payload.label.strip(),
+    )
+    db.add(blk)
+    db.commit()
+    db.refresh(blk)
+    return to_block_out(blk)
+
+
+@router.delete("/admin/blocks/{block_id}", status_code=204)
+def admin_delete_block(block_id: int, db: Session = Depends(get_db), _: None = Depends(require_admin)):
+    blk = db.get(models.VenueBlock, block_id)
+    if not blk:
+        raise HTTPException(404, "Блокировка не найдена")
+    db.delete(blk)
     db.commit()
 
 
