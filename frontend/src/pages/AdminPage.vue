@@ -183,6 +183,7 @@ function emptyVenueForm() {
     capacity: 0,
     area_m2: 0,
     image: '',
+    images: [],
     features: [],
     sort_order: 0,
   }
@@ -283,7 +284,13 @@ function startCreateVenue() {
 
 function startEditVenue(v) {
   venueEditing.value = v.id
-  venueForm.value = { ...v }
+  // Совместимость со старыми залами: если photos пуст, берём одиночное image
+  const images = Array.isArray(v.images) && v.images.length > 0
+    ? [...v.images]
+    : v.image
+      ? [v.image]
+      : []
+  venueForm.value = { ...v, images }
   featureInput.value = ''
   venueError.value = ''
 }
@@ -304,24 +311,28 @@ function removeFeature(f) {
   venueForm.value.features = venueForm.value.features.filter((x) => x !== f)
 }
 
-async function uploadImage(file) {
-  if (!file) return
+async function uploadImages(files) {
+  const list = Array.from(files || [])
+  if (list.length === 0) return
   uploading.value = true
   venueError.value = ''
   try {
-    const fd = new FormData()
-    fd.append('file', file)
-    const res = await fetch('/api/admin/uploads', {
-      method: 'POST',
-      headers: authHeaders(),
-      body: fd,
-    })
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}))
-      throw new Error(data.detail || `Ошибка ${res.status}`)
+    for (const file of list) {
+      const fd = new FormData()
+      fd.append('file', file)
+      const res = await fetch('/api/admin/uploads', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: fd,
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.detail || `Ошибка ${res.status}`)
+      }
+      const { path } = await res.json()
+      if (!venueForm.value.images.includes(path)) venueForm.value.images.push(path)
     }
-    const { path } = await res.json()
-    venueForm.value.image = path
+    venueForm.value.image = venueForm.value.images[0] || ''
   } catch (e) {
     venueError.value = e.message
   } finally {
@@ -330,10 +341,24 @@ async function uploadImage(file) {
   }
 }
 
+function removeVenueImage(idx) {
+  venueForm.value.images.splice(idx, 1)
+  venueForm.value.image = venueForm.value.images[0] || ''
+}
+
+function moveVenueImage(idx, dir) {
+  const images = venueForm.value.images
+  const target = idx + dir
+  if (target < 0 || target >= images.length) return
+  ;[images[idx], images[target]] = [images[target], images[idx]]
+  venueForm.value.image = images[0] || ''
+}
+
 async function saveVenue() {
   venueSaving.value = true
   venueError.value = ''
   try {
+    venueForm.value.image = venueForm.value.images[0] || ''
     const body = JSON.stringify(venueForm.value)
     if (venueEditing.value === 'new') {
       const created = await api('/api/admin/venues', { method: 'POST', headers: authHeaders(), body })
@@ -653,16 +678,28 @@ onMounted(() => {
           </div>
 
           <div class="field">
-            <label>Фото зала</label>
+            <label>Фото зала (можно несколько)</label>
             <div class="image-row">
-              <img v-if="venueForm.image" :src="venueForm.image" alt="Фото зала" class="venue-preview" />
-              <div class="image-actions">
-                <input ref="fileInput" type="file" accept="image/*" class="visually-hidden" @change="uploadImage($event.target.files[0])" />
-                <button class="btn btn-outline" :disabled="uploading" @click="fileInput?.click()">
-                  {{ uploading ? 'Загружаем…' : '📷 Загрузить фото' }}
-                </button>
-                <input v-model="venueForm.image" placeholder="/images/… или URL" />
+              <!-- Список загруженных фото с кнопками <<< >>> удалить -->
+              <div v-if="venueForm.images.length > 0" class="venue-photos-edit">
+                <div v-for="(img, idx) in venueForm.images" :key="img" class="venue-photo-item">
+                  <img :src="img" alt="Фото зала" class="venue-preview" />
+                  <div class="image-actions">
+                    <span v-if="idx === 0" class="muted small-note">Главное фото</span>
+                    <button class="btn btn-outline" :disabled="idx === 0" @click="moveVenueImage(idx, -1)">←</button>
+                    <button class="btn btn-outline" :disabled="idx === venueForm.images.length - 1" @click="moveVenueImage(idx, 1)">→</button>
+                    <button class="btn btn-outline" @click="removeVenueImage(idx)">✕ Удалить</button>
+                  </div>
+                </div>
               </div>
+              <span v-else class="muted small-note">Пока нет фото — загрузите одно или несколько</span>
+            </div>
+            <div class="image-actions" style="margin-top:10px">
+              <input ref="fileInput" type="file" accept="image/*" multiple class="visually-hidden" @change="uploadImages($event.target.files)" />
+              <button class="btn btn-outline" :disabled="uploading" @click="fileInput?.click()">
+                {{ uploading ? 'Загружаем…' : '📷 Загрузить фото' }}
+              </button>
+              <input v-model="venueForm.image" placeholder="/images/… или URL" />
             </div>
           </div>
 
@@ -888,6 +925,10 @@ th { color: var(--muted); font-size: 12.5px; text-transform: uppercase; letter-s
 .small-note { font-size: 13px; }
 .image-row { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
 .venue-preview { width: 180px; height: 110px; object-fit: cover; border-radius: 10px; }
+.venue-photos-edit { display: flex; flex-wrap: wrap; gap: 14px; }
+.venue-photo-item { width: 180px; }
+.venue-photo-item .image-actions { flex-direction: row; flex-wrap: wrap; gap: 4px; min-width: 0; flex: none; }
+.venue-photo-item .image-actions .btn { padding: 4px 8px; }
 .image-actions { display: flex; flex-direction: column; gap: 8px; flex: 1; min-width: 220px; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 .form-actions { display: flex; gap: 12px; margin-top: 18px; }

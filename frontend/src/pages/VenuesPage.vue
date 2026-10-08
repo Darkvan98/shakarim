@@ -4,10 +4,30 @@ import { getSchedule, getVenues, formatDateHuman } from '../api'
 
 const venues = ref([])
 const loading = ref(true)
+// текущий индекс фото по id зала: { [venueId]: number }
+const photoIdx = ref({})
 const expanded = ref(null)
 const schedule = ref([])
 const occLoading = ref(false)
 const occDate = ref(new Date().toISOString().slice(0, 10))
+
+function venuePhotos(v) {
+  const list = Array.isArray(v.images) && v.images.length > 0 ? v.images : v.image ? [v.image] : []
+  return list.filter(Boolean)
+}
+
+function currentPhotoIdx(v) {
+  const idx = photoIdx.value[v.id] || 0
+  const len = venuePhotos(v).length
+  return len ? Math.min(idx, len - 1) : 0
+}
+
+function movePhoto(v, dir) {
+  const len = venuePhotos(v).length
+  if (!len) return
+  const cur = currentPhotoIdx(v)
+  photoIdx.value = { ...photoIdx.value, [v.id]: (cur + dir + len) % len }
+}
 
 async function toggle(v) {
   if (expanded.value === v.id) {
@@ -48,7 +68,26 @@ getVenues()
     <div v-else class="venue-list">
       <div v-for="v in venues" :key="v.id" class="card venue">
         <div class="venue-row">
-          <img :src="v.image" :alt="v.name" />
+          <!-- Карусель фото: несколько снимков, листаются стрелками влево/вправо -->
+          <div
+            v-if="venuePhotos(v).length"
+            class="venue-carousel"
+            @wheel.extra="movePhoto(v, $event.deltaY > 0 ? 1 : -1)"
+          >
+            <img
+              v-for="(p, i) in venuePhotos(v)"
+              :key="p"
+              :src="p"
+              :alt="v.name"
+              class="venue-photo"
+              :class="{ active: i === currentPhotoIdx(v) }"
+            />
+            <template v-if="venuePhotos(v).length > 1">
+              <button class="car-btn prev" aria-label="Предыдущее фото" @click="movePhoto(v, -1)">‹</button>
+              <button class="car-btn next" aria-label="Следующее фото" @click="movePhoto(v, 1)">›</button>
+              <span class="car-counter">{{ currentPhotoIdx(v) + 1 }} / {{ venuePhotos(v).length }}</span>
+            </template>
+          </div>
           <div class="venue-info">
             <h2>{{ v.name }}</h2>
             <p class="muted">{{ v.description }}</p>
@@ -103,6 +142,31 @@ getVenues()
 .venue-list { display: flex; flex-direction: column; gap: 26px; margin-top: 24px; }
 .venue-row { display: grid; grid-template-columns: 340px 1fr; }
 .venue-row img { width: 100%; height: 100%; min-height: 280px; object-fit: cover; }
+
+/* карусель фото зала */
+.venue-carousel { position: relative; height: 100%; min-height: 280px; overflow: hidden; }
+.venue-photo {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%; object-fit: cover;
+  opacity: 0; transition: opacity 0.25s ease;
+}
+.venue-photo.active { opacity: 1; }
+.car-btn {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  width: 38px; height: 38px; border-radius: 50%;
+  border: none; cursor: pointer; font-size: 22px; line-height: 1;
+  background: rgba(255, 255, 255, 0.9); color: var(--navy);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  display: flex; align-items: center; justify-content: center;
+}
+.car-btn:hover { background: #fff; }
+.car-btn.prev { left: 10px; }
+.car-btn.next { right: 10px; }
+.car-counter {
+  position: absolute; bottom: 10px; right: 12px;
+  background: rgba(0, 0, 0, 0.55); color: #fff;
+  border-radius: 999px; padding: 3px 10px; font-size: 12px; font-weight: 600;
+}
 .venue-info { padding: 22px 26px; }
 .features { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 16px; }
 .feature {
@@ -149,6 +213,6 @@ getVenues()
 
 @media (max-width: 820px) {
   .venue-row { grid-template-columns: 1fr; }
-  .venue-row img { height: 200px; min-height: 0; }
+  .venue-carousel { height: 200px; min-height: 0; }
 }
 </style>

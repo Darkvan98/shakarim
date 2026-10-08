@@ -60,6 +60,7 @@ class VenueOut(BaseModel):
     capacity: int
     area_m2: int
     image: str
+    images: list[str]
     features: list[str]
     price_weekday: int
     price_weekend: int
@@ -134,6 +135,7 @@ class VenuePayload(BaseModel):
     capacity: int = Field(default=0, ge=0, le=10000)
     area_m2: int = Field(default=0, ge=0, le=100000)
     image: str = Field(default="", max_length=300)
+    images: list[str] = []
     features: list[str] = []
     price_weekday: int = Field(default=0, ge=0, le=10_000_000)
     price_weekend: int = Field(default=0, ge=0, le=10_000_000)
@@ -183,6 +185,7 @@ def to_venue_out(v: models.Venue) -> VenueOut:
         capacity=v.capacity,
         area_m2=v.area_m2,
         image=v.image,
+        images=(json.loads(v.images) if getattr(v, "images", None) else []),
         features=json.loads(v.features) if v.features else [],
         price_weekday=v.price_weekday,
         price_weekend=v.price_weekend,
@@ -619,8 +622,9 @@ def admin_list_venues(db: Session = Depends(get_db), _: None = Depends(require_a
 def admin_create_venue(payload: VenuePayload, db: Session = Depends(get_db), _: None = Depends(require_admin)):
     venue = models.Venue(
         slug=make_slug(payload.name, db),
-        **payload.model_dump(exclude={"features"}),
+        **payload.model_dump(exclude={"features", "images"}),
         features=json.dumps(payload.features, ensure_ascii=False),
+        images=json.dumps(payload.images, ensure_ascii=False),
     )
     db.add(venue)
     db.commit()
@@ -638,10 +642,11 @@ def admin_update_venue(
     venue = db.get(models.Venue, venue_id)
     if not venue:
         raise HTTPException(404, "Зал не найден")
-    data = payload.model_dump(exclude={"features"})
+    data = payload.model_dump(exclude={"features", "images"})
     for key, value in data.items():
         setattr(venue, key, value)
     venue.features = json.dumps(payload.features, ensure_ascii=False)
+    venue.images = json.dumps(payload.images, ensure_ascii=False)
     db.commit()
     db.refresh(venue)
     return to_venue_out(venue)
@@ -888,6 +893,7 @@ def _ensure_db():
             # Migration for existing tables: add sports_complex column
             # (Base.metadata.create_all doesn't add columns to already-existing tables)
             db.execute(text("ALTER TABLE venues ADD COLUMN IF NOT EXISTS sports_complex VARCHAR DEFAULT ''"))
+            db.execute(text("ALTER TABLE venues ADD COLUMN IF NOT EXISTS images VARCHAR DEFAULT '[]'"))
             db.commit()
             if db.scalar(select(func.count(models.Venue.id))):
                 _db_initialized = True

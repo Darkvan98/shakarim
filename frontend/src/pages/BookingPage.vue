@@ -306,7 +306,7 @@ onMounted(async () => {
       <aside class="card summary">
         <h3>Ваша бронь</h3>
         <div v-if="venue" class="sum-venue">
-          <img :src="venue.image" :alt="venue.name" />
+          <img :src="venue.images?.length ? venue.images[0] : venue.image" :alt="venue.name" />
           <strong>{{ venue.name }}</strong>
         </div>
         <ul class="sum-list">

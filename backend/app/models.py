@@ -17,6 +17,7 @@ class Venue(Base):
     capacity: Mapped[int] = mapped_column(Integer, default=0)
     area_m2: Mapped[int] = mapped_column(Integer, default=0)
     image: Mapped[str] = mapped_column(String, default="")
+    images: Mapped[str] = mapped_column(String, default="")  # JSON-список путей к доп. фото
     features: Mapped[str] = mapped_column(String, default="")  # JSON-список
     price_weekday: Mapped[int] = mapped_column(Integer)  # тг/час, пн-пт
     price_weekend: Mapped[int] = mapped_column(Integer)  # тг/час, сб-вс
