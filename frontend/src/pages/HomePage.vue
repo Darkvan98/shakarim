@@ -36,7 +36,23 @@ import { getGallery, getVenues } from '../api'
             :to="{ path: '/booking', query: { venue: v.slug } }"
             class="venue-card card"
           >
-            <img :src="v.image" :alt="v.name" />
+            <!-- Карусель фото: несколько снимков, листаются стрелками влево/вправо -->
+            <div v-if="venuePhotos(v).length" class="venue-carousel">
+              <img
+                v-for="(p, i) in venuePhotos(v)"
+                :key="p"
+                :src="p"
+                :alt="v.name"
+                class="venue-photo"
+                :class="{ active: i === currentPhotoIdx(v) }"
+              />
+              <template v-if="venuePhotos(v).length > 1">
+                <button class="car-btn prev" aria-label="Предыдущее фото" @click.prevent="movePhoto(v, -1)">‹</button>
+                <button class="car-btn next" aria-label="Следующее фото" @click.prevent="movePhoto(v, 1)">›</button>
+                <span class="car-counter">{{ currentPhotoIdx(v) + 1 }} / {{ venuePhotos(v).length }}</span>
+              </template>
+            </div>
+            <div v-else class="venue-no-photo">Фото пока нет</div>
             <div class="venue-body">
               <h3>{{ v.name }}</h3>
               <p class="muted">{{ v.description }}</p>
@@ -119,6 +135,7 @@ export default {
     return {
       venues: [],
       galleryGroups: [],
+      photoIdx: {},
       loading: true,
       lightbox: null,
       lightboxCaption: null,
@@ -133,6 +150,21 @@ export default {
     }
   },
   methods: {
+    venuePhotos(v) {
+      const list = Array.isArray(v.images) && v.images.length > 0 ? v.images : v.image ? [v.image] : []
+      return list.filter(Boolean)
+    },
+    currentPhotoIdx(v) {
+      const idx = this.photoIdx[v.id] || 0
+      const len = this.venuePhotos(v).length
+      return len ? Math.min(idx, len - 1) : 0
+    },
+    movePhoto(v, dir) {
+      const len = this.venuePhotos(v).length
+      if (!len) return
+      const cur = this.currentPhotoIdx(v)
+      this.photoIdx = { ...this.photoIdx, [v.id]: (cur + dir + len) % len }
+    },
     openLightbox(src, title) {
       this.lightbox = src
       this.lightboxCaption = title
@@ -161,6 +193,35 @@ export default {
 .venue-card { display: block; color: inherit; transition: transform 0.18s ease, box-shadow 0.18s ease; }
 .venue-card:hover { transform: translateY(-4px); box-shadow: 0 12px 32px rgba(50, 66, 102, 0.18); }
 .venue-card img { width: 100%; height: 200px; object-fit: cover; display: block; }
+
+/* карусель фото зала на карточке */
+.venue-carousel { position: relative; height: 200px; overflow: hidden; }
+.venue-photo {
+  position: absolute; inset: 0;
+  width: 100%; height: 200px; object-fit: cover; display: block;
+  opacity: 0; transition: opacity 0.25s ease;
+}
+.venue-photo.active { opacity: 1; }
+.car-btn {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  width: 32px; height: 32px; border-radius: 50%;
+  border: none; cursor: pointer; font-size: 18px; line-height: 1;
+  background: rgba(255, 255, 255, 0.9); color: var(--navy);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  display: flex; align-items: center; justify-content: center;
+}
+.car-btn:hover { background: #fff; }
+.car-btn.prev { left: 8px; }
+.car-btn.next { right: 8px; }
+.car-counter {
+  position: absolute; bottom: 8px; right: 10px;
+  background: rgba(0, 0, 0, 0.55); color: #fff;
+  border-radius: 999px; padding: 2px 9px; font-size: 11.5px; font-weight: 600;
+}
+.venue-no-photo {
+  height: 200px; display: flex; align-items: center; justify-content: center;
+  background: #eef1f6; color: var(--muted); font-size: 14px;
+}
 .venue-body { padding: 18px 20px 20px; }
 .venue-meta { display: flex; gap: 14px; color: var(--muted); font-size: 13.5px; margin: 8px 0; }
 
