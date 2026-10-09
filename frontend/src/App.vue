@@ -118,7 +118,8 @@ const links = [
 }
 
 .footer { background: var(--navy); color: #cfd6e4; margin-top: 60px; }
-.footer-logo { height: 170px; width: auto; display: block; margin-bottom: 18px; }
+.footer-logo { height: 90px; width: auto; display: block; margin: 0 auto 18px; }
+.footer-grid > div { text-align: center; }
 .footer h3, .footer h4 { color: #fff; }
 .footer a { color: var(--gold); }
 .footer-grid {
