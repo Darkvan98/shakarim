@@ -452,6 +452,46 @@ async function addBlock() {
   }
 }
 
+// ----- импорт таблицы занятости на неделю -----
+const importVenueless = ref(false)
+const importWeekStart = ref(mondayOfCurrentWeek())
+const importText = ref('')
+const importLoading = ref(false)
+const importError = ref('')
+const importResult = ref(null)
+
+function mondayOfCurrentWeek() {
+  const d = new Date()
+  const day = (d.getDay() + 6) % 7 // пн=0
+  d.setDate(d.getDate() - day)
+  return d.toISOString().slice(0, 10)
+}
+
+async function importBlocks() {
+  if (!importText.value.trim()) {
+    importError.value = 'Вставьте таблицу в поле выше'
+    return
+  }
+  importLoading.value = true
+  importError.value = ''
+  importResult.value = null
+  try {
+    importResult.value = await api(`/api/admin/venues/${blockVenueId.value}/blocks/import`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ rows: importText.value, week_start: importWeekStart.value }),
+    })
+    if (importResult.value.created > 0) {
+      importText.value = ''
+      await loadBlocks()
+    }
+  } catch (e) {
+    importError.value = e.message
+  } finally {
+    importLoading.value = false
+  }
+}
+
 async function removeBlock(blk) {
   if (!confirm(`Убрать блокировку ${blk.start_time}–${blk.end_time}?`)) return
   blockError.value = ''
@@ -784,6 +824,44 @@ onMounted(() => {
           </table>
         </div>
         <div v-else-if="venues.length === 0" class="muted">Сначала создайте зал</div>
+
+        <!-- Импорт таблицы на неделю -->
+        <div v-if="blockVenueId" class="card venue-form import-card">
+          <h3>📋 Импорт расписания на неделю</h3>
+          <p class="muted small-note">
+            Скопируйте таблицу из Excel / Word и вставьте в поле ниже. Формат одной строки:
+            <em>дата · время начала · время конца · кем занято</em>.
+            Пример: <code>12.10 | 09:00 | 11:00 | Секция волейбола</code>.
+            Можно указывать день недели («Вторник» — будет взят ближайший на выбранной неделе).
+          </p>
+          <div class="grid-3">
+            <div class="field">
+              <label>Неделя начинается с</label>
+              <input v-model="importWeekStart" type="date" />
+            </div>
+          </div>
+          <div class="field">
+            <label>Таблица занятости</label>
+            <textarea
+              v-model="importText"
+              rows="8"
+              placeholder="12.10&#9;09:00&#9;11:00&#9;Секция волейбола&#10;13.10&#9;14:00&#9;16:00&#9;Тренировка секции"
+            ></textarea>
+          </div>
+          <div v-if="importError" class="alert alert-error">{{ importError }}</div>
+          <div v-if="importResult" class="alert alert-success">
+            Добавлено блокировок: {{ importResult.created }}
+            <span v-if="importResult.skipped"> · пропущено дубликатов: {{ importResult.skipped }}</span>
+            <span v-if="importResult.errors && importResult.errors.length" class="import-errors">
+              · ошибки: {{ importResult.errors.length }} — {{ importResult.errors.slice(0, 5).join('; ') }}
+            </span>
+          </div>
+          <div class="form-actions">
+            <button class="btn btn-primary" :disabled="importLoading" @click="importBlocks">
+              {{ importLoading ? 'Импортируем…' : '⬇️ Импорт на неделю' }}
+            </button>
+          </div>
+        </div>
       </div>
 
       <!-- ===== GALLERY TAB ===== -->
@@ -957,6 +1035,9 @@ textarea { width: 100%; font: inherit; padding: 10px 12px; border: 1.5px solid v
 .gallery-edit-item img { width: 100%; height: 110px; object-fit: cover; border-radius: 8px; display: block; }
 .gallery-edit-controls { display: flex; gap: 4px; margin-top: 6px; }
 .gallery-edit-controls .btn { padding: 4px 8px; }
+.import-card { margin-top: 16px; }
+.import-errors { display: block; margin-top: 6px; }
+.import-card code { background: #eef1f6; padding: 2px 6px; border-radius: 6px; }
 .gallery-add-row { display: flex; gap: 8px; flex-wrap: wrap; }
 .gallery-add-row input { flex: 1; min-width: 220px; }
 

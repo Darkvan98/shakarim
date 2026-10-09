@@ -161,6 +161,11 @@ class GalleryGroupOut(GalleryGroupPayload):
     id: int
 
 
+class AdminBlocksImport(BaseModel):
+    rows: str = Field(min_length=1, max_length=20000)
+    week_start: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$")
+
+
 class AdminLoginRequest(BaseModel):
     username: str = Field(min_length=1, max_length=100)
     password: str = Field(min_length=1, max_length=200)
@@ -694,6 +699,71 @@ def to_block_out(blk: models.VenueBlock) -> VenueBlockOut:
         end_time=blk.end_time,
         label=blk.label,
     )
+
+
+@router.post("/admin/venues/{venue_id}/blocks/import")
+def admin_import_blocks(
+    venue_id: int,
+    payload: AdminBlocksImport,
+    db: Session = Depends(get_db),
+    _: None = Depends(require_admin),
+):
+    """Импорт занятости на неделю из вставленной таблицы (Excel/Word/текст).
+
+    Пропускает уже существующие точно совпадающие блокировки; возвращает
+    количество добавленных записей и список ошибок разбора."""
+    from . import _blocks_import
+
+    venue = db.get(models.Venue, venue_id)
+    if not venue:
+        raise HTTPException(404, "Зал не найден")
+
+    try:
+        items, errors = _blocks_import.parse_rows(payload.rows, payload.week_start)
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+
+    if not items:
+        raise HTTPException(422, "Не удалось распознать ни одной строки: " + "; ".join(errors[:5]))
+
+    created = 0
+    skipped = 0
+    for it in items:
+        start_min = parse_hm(it["start_time"])
+        end_min = parse_hm(it["end_time"])
+        if end_min <= start_min or end_min > 24 * 60:
+            errors.append(f"{it['date']}: некорректное время {it['start_time']}–{it['end_time']}")
+            continue
+        # точный дубликат уже не добавляем
+        exists = db.scalar(
+            select(models.VenueBlock).where(
+                models.VenueBlock.venue_id == venue_id,
+                models.VenueBlock.date == it["date"],
+                models.VenueBlock.start_time == it["start_time"],
+                models.VenueBlock.end_time == it["end_time"],
+            )
+        )
+        if exists:
+            skipped += 1
+            continue
+        # пересечение с бронью? — пропускаем такие строки
+        if check_overlap(db, venue_id, it["date"], start_min, end_min):
+            errors.append(f"{it['date']} {it['start_time']}–{it['end_time']}: пересекается с бронью, пропущено")
+            continue
+        blk = models.VenueBlock(
+            venue_id=venue_id,
+            date=it["date"],
+            start_time=it["start_time"],
+            end_time=it["end_time"],
+            label=it["label"],
+        )
+        db.add(blk)
+        created += 1
+
+    if created:
+        db.commit()
+
+    return {"created": created, "skipped": skipped, "errors": errors}
 
 
 @router.get("/admin/venues/{venue_id}/blocks", response_model=list[VenueBlockOut])

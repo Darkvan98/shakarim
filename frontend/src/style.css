@@ -119,6 +119,7 @@ a:hover { color: var(--navy); }
   font-size: 14px;
 }
 .alert-error { background: #fbe4e4; color: #8a2020; }
+.alert-success { background: #e2f4e8; color: #1f7a4d; }
 .alert-info { background: #e8eef5; color: var(--navy); }
 
 .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 22px; }
