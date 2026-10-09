@@ -10,7 +10,7 @@ import { getGallery, getVenues } from '../api'
       <div class="container hero-inner">
         <div class="hero-text">
           <span class="eyebrow">Спорткомплексы Shakarim University</span>
-          <h1>Бронирование спортивных залов<br />в Семее</h1>
+          <h1>Бронирование спортивных залов</h1>
           <div class="hero-actions">
             <router-link to="/booking" class="btn btn-gold">Забронировать зал</router-link>
             <a href="#venues" class="btn btn-outline hero-outline">Посмотреть залы</a>
