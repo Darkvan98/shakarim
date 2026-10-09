@@ -7,6 +7,7 @@ const links = [
   { to: '/', label: 'Главная' },
   { to: '/venues', label: 'Залы и цены' },
   { to: '/booking', label: 'Бронирование' },
+  { to: '/my-bookings', label: 'Ваша бронь' },
 ]
 </script>
 

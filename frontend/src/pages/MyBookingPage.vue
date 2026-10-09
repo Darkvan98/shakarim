@@ -1,22 +1,31 @@
 <script setup>
-import { onMounted, ref } from 'vue'
-import { useRoute } from 'vue-router'
-import { formatDateHuman, getBooking } from '../api'
+import { ref } from 'vue'
+import { formatDateHuman, getBookingsByName } from '../api'
 
-const route = useRoute()
-const booking = ref(null)
+const nameQuery = ref('')
+const bookings = ref([])
 const error = ref('')
-const loading = ref(true)
+const searched = ref('')
+const loading = ref(false)
 
-onMounted(async () => {
+async function search() {
+  const q = nameQuery.value.trim()
+  if (q.length < 2) {
+    error.value = 'Введите имя (минимум 2 символа)'
+    return
+  }
+  error.value = ''
+  loading.value = true
+  searched.value = q
   try {
-    booking.value = await getBooking(route.params.code)
+    bookings.value = await getBookingsByName(q)
   } catch (e) {
     error.value = e.message
+    bookings.value = []
   } finally {
     loading.value = false
   }
-})
+}
 
 const statusLabels = {
   pending: 'Ожидает подтверждения',
@@ -27,28 +36,41 @@ const statusLabels = {
 
 <template>
   <div class="container section narrow">
-    <span class="eyebrow">Ваша бронь</span>
-    <h1>Бронь {{ route.params.code }}</h1>
+    <span class="eyebrow">Мои брони</span>
+    <h1>Найти бронь по имени</h1>
+    <p class="muted">Введите имя и фамилию, которые вы указали при бронировании.</p>
 
-    <div v-if="loading" class="muted">Загрузка…</div>
-    <div v-else-if="error" class="alert alert-error">{{ error }}</div>
+    <div class="find-row card">
+      <input
+        v-model="nameQuery"
+        placeholder="Например: Айдана Смагулова"
+        @keyup.enter="search"
+      />
+      <button class="btn btn-primary" :disabled="loading" @click="search">
+        {{ loading ? 'Ищем…' : 'Найти' }}
+      </button>
+    </div>
 
-    <div v-else class="card ticket">
+    <div v-if="error" class="alert alert-error" style="margin-top:14px">{{ error }}</div>
+
+    <div v-if="searched && !loading && bookings.length === 0 && !error" class="muted" style="margin-top:14px">
+      Броней на имя «{{ searched }}» не найдено.
+    </div>
+
+    <div v-for="b in bookings" :key="b.id" class="card ticket">
       <div class="ticket-head">
-        <span class="badge" :class="`badge-${booking.status}`">{{ statusLabels[booking.status] || booking.status }}</span>
-        <strong class="code">{{ booking.code }}</strong>
+        <span class="badge" :class="`badge-${b.status}`">{{ statusLabels[b.status] || b.status }}</span>
+        <strong>{{ b.customer_name }}</strong>
       </div>
-      <h2>{{ booking.venue_name }}</h2>
+      <h2>{{ b.venue_name }}</h2>
       <ul class="sum-list">
-        <li><span>Дата</span><strong>{{ formatDateHuman(booking.date) }}</strong></li>
-        <li><span>Время</span><strong>{{ booking.start_time }}–{{ booking.end_time }}</strong></li>
-        <li><span>Длительность</span><strong>{{ booking.hours }} ч</strong></li>
-
-        <li><span>Имя</span><strong>{{ booking.customer_name }}</strong></li>
-        <li><span>Телефон</span><strong>{{ booking.phone }}</strong></li>
+        <li><span>Дата</span><strong>{{ formatDateHuman(b.date) }}</strong></li>
+        <li><span>Время</span><strong>{{ b.start_time }}–{{ b.end_time }}</strong></li>
+        <li><span>Длительность</span><strong>{{ b.hours }} ч</strong></li>
+        <li><span>Телефон</span><strong>{{ b.phone }}</strong></li>
       </ul>
       <div class="qr-hint muted">
-        Назовите код брони <strong>{{ booking.code }}</strong> на входе в спорткомплекс.
+        Подтверждение брони — по имени и телефону на входе в спорткомплекс.
       </div>
     </div>
   </div>
@@ -56,8 +78,10 @@ const statusLabels = {
 
 <style scoped>
 .narrow { max-width: 640px; }
+h1, p { margin-top: 6px; }
+.find-row { display: flex; gap: 10px; padding: 16px 18px; margin-top: 14px; }
+.find-row input { flex: 1; }
 .ticket { padding: 26px 30px; margin-top: 16px; }
 .ticket-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-.code { font-size: 18px; color: var(--navy); letter-spacing: 0.06em; }
 .qr-hint { margin-top: 14px; padding: 12px 16px; background: #eef1f6; border-radius: 10px; }
 </style>

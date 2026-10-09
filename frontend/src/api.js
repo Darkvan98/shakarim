@@ -52,6 +52,10 @@ export function getBooking(code) {
   return api(`/api/bookings/${code}`)
 }
 
+export function getBookingsByName(name) {
+  return api(`/api/bookings/by-name?name=${encodeURIComponent(name)}`)
+}
+
 
 export function formatDateHuman(dateStr) {
   return new Date(dateStr + 'T00:00:00').toLocaleDateString('ru-RU', {

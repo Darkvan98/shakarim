@@ -1,13 +1,12 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { createBooking, formatDateHuman, getOccupied, getVenues } from '../api'
 
 const OPEN_HOUR = 8
 const CLOSE_HOUR = 22
 
 const route = useRoute()
-const router = useRouter()
 
 const venues = ref([])
 const venueId = ref(null)
@@ -219,7 +218,6 @@ async function submit() {
       phone: phone.value,
       comment: comment.value,
     })
-    router.push(`/booking/${booking.value.code}`)
   } catch (e) {
     error.value = e.message
   } finally {
@@ -239,7 +237,8 @@ onMounted(async () => {
   <div class="container section booking-page">
     <div v-if="booking" class="card success-card">
       <h2>Бронь создана! 🎉</h2>
-      <p>Код вашей брони: <strong class="code">{{ booking.code }}</strong></p>
+      <p>Забронировано на имя: <strong>{{ booking.customer_name }}</strong></p>
+      <p class="muted">Найти её можно в разделе «<router-link to="/my-bookings">Ваша бронь</router-link>» по имени.</p>
     </div>
 
     <div v-if="error" class="alert alert-error">{{ error }}</div>

@@ -437,6 +437,20 @@ def create_booking(payload: BookingCreate, db: Session = Depends(get_db)):
     return to_booking_out(booking)
 
 
+@router.get("/bookings/by-name", response_model=list[BookingOut])
+def get_bookings_by_name(name: str, db: Session = Depends(get_db)):
+    """Поиск броней по имени человека (без кода — бронирование идёт по имени)."""
+    name_norm = name.strip().lower()
+    if len(name_norm) < 2:
+        raise HTTPException(422, "Введите минимум 2 символа имени")
+    bookings = db.scalars(
+        select(models.Booking)
+        .where(func.lower(models.Booking.customer_name) == name_norm)
+        .order_by(models.Booking.created_at.desc())
+    ).all()
+    return [to_booking_out(b) for b in bookings]
+
+
 @router.get("/bookings/{code}", response_model=BookingOut)
 def get_booking(code: str, db: Session = Depends(get_db)):
     b = db.scalar(select(models.Booking).where(models.Booking.code == code))

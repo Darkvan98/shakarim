@@ -85,8 +85,8 @@ import { getGallery, getVenues } from '../api'
           </div>
           <div class="step">
             <div class="step-num">3</div>
-            <h3>Получите код брони</h3>
-            <p class="muted">Покажите код на входе в спорткомплекс. Готово!</p>
+            <h3>Бронь по имени</h3>
+            <p class="muted">Достаточно назвать имя на входе в спорткомплекс. Готово!</p>
           </div>
         </div>
       </div>

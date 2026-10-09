@@ -14,7 +14,7 @@ const router = createRouter({
     { path: '/', name: 'home', component: Home },
     { path: '/venues', name: 'venues', component: Venues },
     { path: '/booking', name: 'booking', component: Booking },
-    { path: '/booking/:code', name: 'my-booking', component: MyBooking },
+    { path: '/my-bookings', name: 'my-bookings', component: MyBooking },
     { path: '/admin', name: 'admin', component: Admin },
   ],
   scrollBehavior(to) {
