@@ -167,15 +167,6 @@ class AdminBlocksImport(BaseModel):
     image: str | None = Field(default=None, max_length=4000)
 
 
-class AdminBlocksImportOut(BaseModel):
-    created: int = 0
-    skipped: int = 0
-    errors: list[str] = []
-    preview: str | None = None
-    incomplete_ocr: bool = False
-    warning: str | None = None
-
-
 class AdminLoginRequest(BaseModel):
     username: str = Field(min_length=1, max_length=100)
     password: str = Field(min_length=1, max_length=200)
@@ -238,7 +229,7 @@ def to_booking_out(b: models.Booking) -> BookingOut:
 
 def validate_date(date_str: str) -> date:
     try:
-        d = datetime.strptime(date_str, "%Y-%m-%d").date()
+        d = datetime.strptime(date_str, "Y-m-d").date()
     except ValueError:
         raise HTTPException(422, "Некорректная дата, нужен формат YYYY-MM-DD")
     if d < date.today():
@@ -727,7 +718,7 @@ def admin_import_blocks_v2(
     количество добавленных записей и список ошибок разбора."""
 
 
-def _ocr_image_stub(image_data_url: str) -> str | None:
+def _ocr_image_stub():
     """Placeholder OCR — сейчас не используется, вернёт None."""
     return None
 
@@ -816,17 +807,17 @@ def admin_import_blocks(
 
     Пока распознавание фото не полностью настроено — возвращает только предупреждение.
     """
-    return admin_import_blocks_v2(venue_id, payload, db, _)
-
-
-@router.post("/admin/venues/{venue_id}/blocks/import", response_model=AdminBlocksImportOut, status_code=201)
-def admin_import_blocks_v2(
-    venue_id: int,
-    payload: AdminBlocksImport,
-    db: Session = Depends(get_db),
-    _: None = Depends(require_admin),
-):
+    if payload.image:
+        return {
+            "created": 0,
+            "skipped": 0,
+            "errors": ["OCR ещё не настроен — пока не автоматическое распознавание из фото"],
+            "warning": "OCR ещё не настроен — пока не автоматическое распознавание из фото",
+        }
     return admin_import_blocks(venue_id, payload, db, _)
+
+
+
 
 
 @router.get("/admin/venues/{venue_id}/blocks", response_model=list[VenueBlockOut])
