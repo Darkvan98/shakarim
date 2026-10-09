@@ -453,21 +453,12 @@ async function addBlock() {
 }
 
 // ----- импорт таблицы занятости на неделю -----
-const importImageFile = ref(null)
+const importVenueless = ref(false)
+const importWeekStart = ref(mondayOfCurrentWeek())
 const importText = ref('')
 const importLoading = ref(false)
 const importError = ref('')
 const importResult = ref(null)
-const importParsedPreview = ref(null)
-
-function readFileAsImage(file) {
-  return new Promise((resolve, reject) => {
-    const r = new FileReader()
-    r.onload = () => resolve(r.result)
-    r.onerror = reject
-    r.readAsDataURL(file)
-  })
-}
 
 function mondayOfCurrentWeek() {
   const d = new Date()
@@ -477,8 +468,8 @@ function mondayOfCurrentWeek() {
 }
 
 async function importBlocks() {
-  if (!importText.value.trim() && !importImageFile.value) {
-    importError.value = 'Загрузите таблицу в виде фото или вставьте текст'
+  if (!importText.value.trim()) {
+    importError.value = 'Вставьте таблицу в поле выше'
     return
   }
   importLoading.value = true
@@ -488,11 +479,7 @@ async function importBlocks() {
     importResult.value = await api(`/api/admin/venues/${blockVenueId.value}/blocks/import`, {
       method: 'POST',
       headers: authHeaders(),
-      body: JSON.stringify({
-        rows: importText.value || "",
-        week_start: importWeekStart.value,
-        image: importImageFile.value || null,
-      }),
+      body: JSON.stringify({ rows: importText.value, week_start: importWeekStart.value }),
     })
     if (importResult.value.created > 0) {
       importText.value = ''
@@ -857,35 +844,12 @@ onMounted(() => {
               <input v-model="importWeekStart" type="date" />
             </div>
           </div>
-          <div class="import-only-row">
-            <input
-              ref="importFileInput"
-              type="file"
-              accept="image/*"
-              class="visually-hidden"
-              @change="onImportFile($event.target.files[0])"
-            />
-            <button class="btn btn-outline" @click="importFileInput?.click()">
-              📸 Загрузить таблицу (фото)
-            </button>
-            <span v-if="importImageFile" class="import-file-label">{{ importImageFile.name }}</span>
-            <button class="btn btn-outline btn-sm" @click="importImageFile = null">
-              ✕ Удалить
-            </button>
-          </div>
-          <div v-if="importImageFile" class="import-preview-wrap">
-            <img :src="importImageFile" alt="Загруженное фото таблицы" class="import-preview-img" />
-            <div class="import-note">
-              Загружено {{ importImageFile.slice(0, 60) }}…
-              Пока это только файл — распознавание текста из фото не настроено.
-            </div>
-          </div>
           <div class="field">
-            <label>Текст после распознавания / вставка таблицы</label>
+            <label>Таблица занятости</label>
             <textarea
               v-model="importText"
               rows="8"
-              placeholder="Прямо вставьте текст расписания, либо результат распознавания фото"
+              placeholder="12.10&#9;09:00&#9;11:00&#9;Секция волейбола&#10;13.10&#9;14:00&#9;16:00&#9;Тренировка секции"
             ></textarea>
           </div>
           <div v-if="importError" class="alert alert-error">{{ importError }}</div>

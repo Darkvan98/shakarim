@@ -162,9 +162,8 @@ class GalleryGroupOut(GalleryGroupPayload):
 
 
 class AdminBlocksImport(BaseModel):
-    rows: str = Field(default="", max_length=20000)
+    rows: str = Field(min_length=1, max_length=20000)
     week_start: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$")
-    image: str | None = Field(default=None, max_length=4000)
 
 
 class AdminLoginRequest(BaseModel):
@@ -229,7 +228,7 @@ def to_booking_out(b: models.Booking) -> BookingOut:
 
 def validate_date(date_str: str) -> date:
     try:
-        d = datetime.strptime(date_str, "Y-m-d").date()
+        d = datetime.strptime(date_str, "%Y-%m-%d").date()
     except ValueError:
         raise HTTPException(422, "Некорректная дата, нужен формат YYYY-MM-DD")
     if d < date.today():
@@ -703,7 +702,7 @@ def to_block_out(blk: models.VenueBlock) -> VenueBlockOut:
 
 
 @router.post("/admin/venues/{venue_id}/blocks/import")
-def admin_import_blocks_v2(
+def admin_import_blocks(
     venue_id: int,
     payload: AdminBlocksImport,
     db: Session = Depends(get_db),
@@ -716,11 +715,7 @@ def admin_import_blocks_v2(
     записи уходят в указанные в колонках залы).
     Пропускает уже существующие точно совпадающие блокировки; возвращает
     количество добавленных записей и список ошибок разбора."""
-
-
-def _ocr_image_stub():
-    """Placeholder OCR — сейчас не используется, вернёт None."""
-    return None
+    from . import _blocks_import
 
     venue = db.get(models.Venue, venue_id)
     if not venue:
@@ -730,17 +725,8 @@ def _ocr_image_stub():
     venue_by_name = {v.name.strip().lower(): v for v in all_venues}
     venue_names = list(venue_by_name.keys())
 
-    rows_text = payload.rows
-    if payload.image and rows_text.strip() == "":
-        # Мягкий предпросмотр изображения: попробовать OCR — если доступен, вернуть распознанный текст и предупреждение.
-        ocr_result = _ocr_image_stub(payload.image)
-        if ocr_result is not None:
-            return { "preview": ocr_result[:10], "incomplete_ocr": True, "warning": "OCR не настроен — пока не автоматическое распознавание из фото" }
-        # пока OCR не настроен — мягкий fallback: путь неверный, но не падать
-        return { "preview": None, "incomplete_ocr": True, "warning": "OCR не настроен — пока не автоматическое распознавание из фото" }
-
     try:
-        items, errors = _blocks_import.parse_rows(rows_text, payload.week_start, venue_names)
+        items, errors = _blocks_import.parse_rows(payload.rows, payload.week_start, venue_names)
     except ValueError as e:
         raise HTTPException(422, str(e))
 
@@ -794,30 +780,6 @@ def _ocr_image_stub():
         db.commit()
 
     return {"created": created, "skipped": skipped, "errors": errors}
-
-
-@router.post("/admin/venues/{venue_id}/blocks/import", response_model=AdminBlocksImportOut, status_code=201)
-def admin_import_blocks(
-    venue_id: int,
-    payload: AdminBlocksImport,
-    db: Session = Depends(get_db),
-    _: None = Depends(require_admin),
-):
-    """Импорт или предпросмотр расписания из вставленного текста или фото таблицы.
-
-    Пока распознавание фото не полностью настроено — возвращает только предупреждение.
-    """
-    if payload.image:
-        return {
-            "created": 0,
-            "skipped": 0,
-            "errors": ["OCR ещё не настроен — пока не автоматическое распознавание из фото"],
-            "warning": "OCR ещё не настроен — пока не автоматическое распознавание из фото",
-        }
-    return admin_import_blocks(venue_id, payload, db, _)
-
-
-
 
 
 @router.get("/admin/venues/{venue_id}/blocks", response_model=list[VenueBlockOut])
