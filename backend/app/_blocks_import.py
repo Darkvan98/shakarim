@@ -91,10 +91,16 @@ def _parse_date(s: str, week_start: _dt.date) -> _dt.date | None:
     return None
 
 
-def parse_rows(text: str, week_start_str: str) -> tuple[list[dict], list[str]]:
+def parse_rows(text: str, week_start_str: str, venue_names: list[str] | None = None):
     """Разбирает вставленный текст на записи.
 
-    Возвращает (записи, ошибки). Запись: {date, start_time, end_time, label}.
+    Поддержаны форматы строк:
+    1) Построчный: дата · время начала · время конца · кем занято.
+    2) Таблица «день недели × залы»: первая колонка — день, дальше по колонке
+       ячейки вида «ПОК 18:10–20:00». Названия колонок сопоставляются со списком
+       залов (venue_names); для каждой записи возвращается venue_name.
+
+    Возвращает (записи, ошибки). Запись: {venue_name, date, start_time, end_time, label}.
     """
     try:
         week_start = _dt.date.fromisoformat(week_start_str)
@@ -104,6 +110,78 @@ def parse_rows(text: str, week_start_str: str) -> tuple[list[dict], list[str]]:
     items: list[dict] = []
     errors: list[str] = []
 
+    # --- Таблица «день недели × залы»? ---
+    lines = [l.strip() for l in text.splitlines() if l.strip()]
+    header_cols = None
+    if venue_names and len(lines) >= 2:
+        first = lines[0]
+        cols = [p.strip() for p in _SPLIT_RE.split(first) if p.strip()]
+        # В шапке нет времени, файлов дат нет
+        has_time = bool(_TIME_RE.search(first))
+        matches = 0
+        if not has_time:
+            for c in cols[1:]:
+                cl = c.lower().strip()
+                for vn in venue_names:
+                    vl = vn.lower().strip()
+                    if vl and (vl in cl or cl in vl):
+                        matches += 1
+                        break
+        if not has_time and matches >= max(1, len(cols) - 1) // 2:
+            header_cols = cols
+
+    if header_cols is not None:
+        # Сопоставление колонок с залами
+        col_venue: list[str | None] = [None]
+        for c in header_cols[1:]:
+            cl = c.lower().strip()
+            found = None
+            for vn in venue_names:
+                vl = vn.lower().strip()
+                if vl and (vl in cl or cl in vl):
+                    found = vn
+                    break
+            col_venue.append(found)
+
+        for lineno, line in enumerate(lines[1:], start=2):
+            parts = [p.strip() for p in _SPLIT_RE.split(line) if p.strip()]
+            if not parts:
+                continue
+            day_raw = parts[0]
+            d = _parse_date(day_raw, week_start)
+            if d is None:
+                errors.append(f"Строка {lineno}: не распознан день «{day_raw[:40]}»")
+                continue
+            # Ячейки по колонкам; в Excel при вставке пустые колонки могут затираться —
+            # сопоставляем по индексу, если частей меньше, чем колонок, с ожидаемым сдвигом
+            for idx, vn in enumerate(col_venue[1:], start=1):
+                cell = parts[idx] if idx < len(parts) else "—"
+                if not vn:
+                    continue
+                cl = cell.strip()
+                if not cl or cl in {"—", "-", "–", "—", ""}:
+                    continue
+                mr = _TIME_RANGE_RE.search(cl)
+                if not mr:
+                    errors.append(f"Строка {lineno}, «{header_cols[idx] if idx < len(header_cols) else idx}»: нет времени в «{cl[:40]}»")
+                    continue
+                ts = _parse_time_to_min(mr.group(1))
+                te = _parse_time_to_min(mr.group(2))
+                if ts is None or te is None or te <= ts:
+                    errors.append(f"Строка {lineno}, «{header_cols[idx] if idx < len(header_cols) else idx}»: некорректное время «{cl[:40]}»")
+                    continue
+                label = _TIME_RANGE_RE.sub("", cl).strip(" ;|\t–—-. ")
+                items.append({
+                    "venue_name": vn,
+                    "date": d.isoformat(),
+                    "start_time": f"{ts // 60:02d}:{ts % 60:02d}",
+                    "end_time": f"{te // 60:02d}:{te % 60:02d}",
+                    "label": label or "",
+                })
+
+        return items, errors
+
+    # --- Построчный формат (дата · от · до · кем) ---
     for lineno, raw in enumerate(text.splitlines(), start=1):
         line = raw.strip()
         if not line:
@@ -177,6 +255,7 @@ def parse_rows(text: str, week_start_str: str) -> tuple[list[dict], list[str]]:
         label = _re.sub(r"\b\d{1,2}[:.:]\d{2}\b", "", label).strip(" ;|\t–—- ")
 
         items.append({
+            "venue_name": None,
             "date": date_val.isoformat(),
             "start_time": f"{time_start // 60:02d}:{time_start % 60:02d}",
             "end_time": f"{time_end // 60:02d}:{time_end % 60:02d}",

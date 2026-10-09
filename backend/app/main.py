@@ -710,6 +710,9 @@ def admin_import_blocks(
 ):
     """Импорт занятости на неделю из вставленной таблицы (Excel/Word/текст).
 
+    Поддержаны 2 формата: построчный (дата·от·до·кем — записи в выбранный зал)
+    и таблица «день недели × залы» (колонки = залы, ячейки «ПОК 18:10–20:00» —
+    записи уходят в указанные в колонках залы).
     Пропускает уже существующие точно совпадающие блокировки; возвращает
     количество добавленных записей и список ошибок разбора."""
     from . import _blocks_import
@@ -718,8 +721,12 @@ def admin_import_blocks(
     if not venue:
         raise HTTPException(404, "Зал не найден")
 
+    all_venues = db.scalars(select(models.Venue)).all()
+    venue_by_name = {v.name.strip().lower(): v for v in all_venues}
+    venue_names = list(venue_by_name.keys())
+
     try:
-        items, errors = _blocks_import.parse_rows(payload.rows, payload.week_start)
+        items, errors = _blocks_import.parse_rows(payload.rows, payload.week_start, venue_names)
     except ValueError as e:
         raise HTTPException(422, str(e))
 
@@ -729,6 +736,15 @@ def admin_import_blocks(
     created = 0
     skipped = 0
     for it in items:
+        # Табличный формат: конкретный зал из колонки; иначе — выбранный в админке зал
+        vn = (it.get("venue_name") or "").strip()
+        target_venue = venue
+        if vn:
+            tv = venue_by_name.get(vn.lower())
+            if tv is None:
+                errors.append(f"Зал «{vn}» не найден — запись пропущена")
+                continue
+            target_venue = tv
         start_min = parse_hm(it["start_time"])
         end_min = parse_hm(it["end_time"])
         if end_min <= start_min or end_min > 24 * 60:
@@ -737,7 +753,7 @@ def admin_import_blocks(
         # точный дубликат уже не добавляем
         exists = db.scalar(
             select(models.VenueBlock).where(
-                models.VenueBlock.venue_id == venue_id,
+                models.VenueBlock.venue_id == target_venue.id,
                 models.VenueBlock.date == it["date"],
                 models.VenueBlock.start_time == it["start_time"],
                 models.VenueBlock.end_time == it["end_time"],
@@ -747,11 +763,11 @@ def admin_import_blocks(
             skipped += 1
             continue
         # пересечение с бронью? — пропускаем такие строки
-        if check_overlap(db, venue_id, it["date"], start_min, end_min):
-            errors.append(f"{it['date']} {it['start_time']}–{it['end_time']}: пересекается с бронью, пропущено")
+        if check_overlap(db, target_venue.id, it["date"], start_min, end_min):
+            errors.append(f"{it['date']} {it['start_time']}–{it['end_time']} ({target_venue.name}): пересекается с бронью, пропущено")
             continue
         blk = models.VenueBlock(
-            venue_id=venue_id,
+            venue_id=target_venue.id,
             date=it["date"],
             start_time=it["start_time"],
             end_time=it["end_time"],
